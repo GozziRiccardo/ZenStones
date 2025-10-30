@@ -1,0 +1,25 @@
+name: Task
+description: Small, focused task for Codex
+title: "task: <short description>"
+labels: ["task"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are we changing and why?
+      placeholder: >
+        E.g., set up React + TS scaffold or add rules file; keep commit small.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Checklist that defines done.
+      placeholder: |
+        - [ ] Code compiles
+        - [ ] Lints pass
+        - [ ] Basic tests pass
+    validations:
+      required: true
