@@ -29,3 +29,10 @@ export function labelForOpponentHalf(r:number,c:number, owner:'W'|'B', labels:La
     return labels.whiteHalf[r][c] || 0;
   }
 }
+
+export function labelForPlayerHalf(r:number,c:number, player:'W'|'B', labels:Labels): number {
+  if (player === 'W') {
+    return labels.whiteHalf[r][c] || 0;
+  }
+  return labels.blackHalf[r][c] || 0;
+}
