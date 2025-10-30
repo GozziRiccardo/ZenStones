@@ -1,6 +1,6 @@
-import type { GameState, Player, Stone } from './types';
+import type { GameState, Player, Stone, ScoreDetail } from './types';
 import { DIR } from './types';
-import { labelForOpponentHalf } from './labels';
+import { labelForOpponentHalf, labelForPlayerHalf } from './labels';
 
 export function emptyBoard(rows=10, cols=10): (string|null)[][] {
   return Array.from({length: rows},()=>Array(cols).fill(null));
@@ -39,6 +39,13 @@ export function legalMoves(state:GameState, s:Stone): {r:number;c:number}[] {
 }
 
 export function recalcScores(state:GameState) {
+  const details = computeScoreDetails(state);
+  state.scores.W = details.W.total;
+  state.scores.B = details.B.total;
+  state.scoreDetails = details;
+}
+
+export function computeScoreDetails(state: GameState): Record<Player, ScoreDetail> {
   const baseW = state.credits.W;
   const baseB = state.credits.B;
   let bonusW = 0, bonusB = 0;
@@ -50,9 +57,16 @@ export function recalcScores(state:GameState) {
       if (s.owner === 'W') bonusW += pts; else bonusB += pts;
     }
   }
-  state.scores.W = baseW + bonusW;
-  state.scores.B = baseB + bonusB;
+  return {
+    W: { credits: baseW, position: bonusW, total: baseW + bonusW },
+    B: { credits: baseB, position: bonusB, total: baseB + bonusB },
+  };
+}
+
+export function squareCostForPlayer(state: GameState, player: Player, r: number, c: number): number {
+  return labelForPlayerHalf(r, c, player, state.labels);
 }
 
 let uid = 0;
 export function newId(){ uid += 1; return 'S'+uid; }
+export function resetIdCounter(){ uid = 0; }

@@ -6,15 +6,24 @@ type BoardProps = {
   state: GameState;
   onSquareClick: (r:number,c:number)=>void;
   highlights?: {r:number;c:number}[];
+  selectedId?: string | null;
 };
 
-export function Board({ state, onSquareClick, highlights=[] }: BoardProps){
+export function Board({ state, onSquareClick, highlights = [], selectedId }: BoardProps){
   const rows = state.board.length;
   const cols = state.board[0].length;
   const isHighlight = (r:number,c:number) => highlights.some(p=>p.r===r && p.c===c);
   const mid = Math.floor(rows/2);
+  const classes = ['board','grid'];
+  if (state.phase === 'PLACEMENT') {
+    classes.push('placement');
+    classes.push(state.turn === 'B' ? 'turn-b' : 'turn-w');
+  }
   return (
-    <div className="board grid" style={{gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`}}>
+    <div
+      className={classes.join(' ')}
+      style={{gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`}}
+    >
       {Array.from({length: rows}).map((_, r)=>(
         Array.from({length: cols}).map((__, c)=>{
           const dark = (r+c)%2===1;
@@ -22,11 +31,35 @@ export function Board({ state, onSquareClick, highlights=[] }: BoardProps){
           if (isHighlight(r,c)) sqClasses.push('reach');
           const id = state.board[r][c];
           const stone = id ? state.stones[id] : null;
-          const label = (r<mid) ? state.labels.blackHalf[r][c] : state.labels.whiteHalf[r][c];
+          const whiteLabel = state.labels.whiteHalf[r][c];
+          const blackLabel = state.labels.blackHalf[r][c];
+          const label = r < mid ? blackLabel : whiteLabel;
+          sqClasses.push(r < mid ? 'half-black' : 'half-white');
+          if (state.phase === 'PLACEMENT') {
+            const activeHalf = state.turn === 'W' ? r >= mid : r < mid;
+            sqClasses.push(activeHalf ? 'active-half' : 'inactive-half');
+          }
+          if (selectedId && id === selectedId) {
+            sqClasses.push('selected');
+          }
+          const costForWhite = whiteLabel;
+          const costForBlack = blackLabel;
+          const tooltipCost = state.phase === 'PLACEMENT'
+            ? state.turn === 'W'
+              ? costForWhite
+              : costForBlack
+            : label;
+          const showCost = tooltipCost > 0;
+          const isNew = id && state.lastPlacementId === id;
           return (
-            <div key={`${r}-${c}`} className={sqClasses.join(' ')} onClick={()=>onSquareClick(r,c)}>
+            <div
+              key={`${r}-${c}`}
+              className={sqClasses.join(' ')}
+              onClick={()=>onSquareClick(r,c)}
+              data-cost={showCost ? tooltipCost : undefined}
+            >
               {stone && (
-                <div style={{position:'relative'}}>
+                <div className={`stone-wrapper${isNew ? ' drop' : ''}`}>
                   <StoneIcon d={(stone.d||1) as any} />
                   {stone.dirs ? <DirArrows dirs={stone.dirs} /> : null}
                 </div>
