@@ -1,13 +1,14 @@
 # Chesslike (working title)
 
-Repository prepared for a simple, chess‑like game. Rules will be added next.
+Repository prepared for a simple, chess-like game. Rules are now documented in [`docs/rules.md`](docs/rules.md).
 
 ## What’s here
 
-- `README.md` — you’re reading it.
+- `README.md` — project overview and links.
 - `LICENSE` — MIT (change the name/year if needed).
 - `.gitignore` — Node/TypeScript focused.
 - `.github/ISSUE_TEMPLATE/task.yml` — quick template to brief Codex on tasks.
+- `docs/rules.md` — complete specification for the ZenStones hot-seat MVP.
 
 ## Quick start (after you add code)
 
