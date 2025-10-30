@@ -3,7 +3,7 @@ import * as React from 'react';
 type Dist = 1|2|3|4|5;
 
 export function StoneIcon({ d, color='currentColor' }: { d: Dist; color?: string }) {
-  const size = 28, cx = 14, cy = 14, r = 9;
+  const size = 38, cx = 19, cy = 19, r = 13;
 
   const poly = (n: number, rr = r) =>
     Array.from({ length: n }, (_, i) => {
@@ -49,14 +49,14 @@ export function StoneIcon({ d, color='currentColor' }: { d: Dist; color?: string
   );
 }
 
-export function DirArrows({ dirs, color='currentColor' }: { dirs:number; color?:string }){
-  const style: React.CSSProperties = { position:'absolute', fontSize:12, color };
+export function DirArrows({ dirs, color='#ef4444' }: { dirs:number; color?:string }){
+  const style: React.CSSProperties = { position:'absolute', fontSize:18, fontWeight:700, color, textShadow: '0 0 4px rgba(0,0,0,0.35)' };
   return (
     <>
-      {(dirs & 1) ? <span style={{...style, right:4}}>→</span> : null}
-      {(dirs & 2) ? <span style={{...style, left:4}}>←</span> : null}
-      {(dirs & 4) ? <span style={{...style, top:2}}>↑</span> : null}
-      {(dirs & 8) ? <span style={{...style, bottom:2}}>↓</span> : null}
+      {(dirs & 1) ? <span style={{...style, right:2}}>→</span> : null}
+      {(dirs & 2) ? <span style={{...style, left:2}}>←</span> : null}
+      {(dirs & 4) ? <span style={{...style, top:0}}>↑</span> : null}
+      {(dirs & 8) ? <span style={{...style, bottom:0}}>↓</span> : null}
     </>
   );
 }
