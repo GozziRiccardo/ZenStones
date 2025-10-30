@@ -1,0 +1,48 @@
+:root{
+  --rose-50:#fff1f2;
+  --rose-100:#ffe4e6;
+  --rose-200:#fecdd3;
+  --rose-300:#fda4af;
+  --rose-400:#fb7185;
+  --rose-500:#f43f5e;
+  --slate-900:#0f172a;
+  --slate-700:#334155;
+  --slate-600:#475569;
+  --white:#ffffff;
+}
+
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,Apple Color Emoji,Segoe UI Emoji;background:var(--rose-50);color:var(--slate-700)}
+
+.container{max-width:1100px;margin:0 auto;padding:24px}
+.h1{font-size:28px;font-weight:800;color:var(--rose-500);margin:0 0 12px}
+.row{display:flex;gap:12px;align-items:center;justify-content:space-between}
+.card{background:rgba(255,255,255,0.9);border:1px solid var(--rose-200);border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:12px}
+
+.btn{border:none;border-radius:12px;padding:8px 12px;background:var(--rose-500);color:white;cursor:pointer}
+.btn:hover{background:var(--rose-400)}
+.btn.outline{background:white;color:var(--rose-500);border:1px solid var(--rose-300)}
+.btn.outline:hover{background:var(--rose-100)}
+
+.grid{display:grid;gap:2px}
+.board{aspect-ratio:1/1;width:min(90vw,700px);background:var(--rose-200);border-radius:16px;overflow:hidden;border:1px solid var(--rose-300)}
+.square{display:flex;align-items:center;justify-content:center;position:relative;font-size:22px;user-select:none}
+.square.light{background:var(--rose-100)}
+.square.dark{background:var(--rose-300)}
+.square .label{position:absolute;left:6px;bottom:4px;font-size:10px;color:rgba(0,0,0,0.45)}
+.square.reach::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:rgba(244,63,94,0.8);box-shadow:0 0 0 4px rgba(244,63,94,0.25)}
+
+.hud{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{padding:6px 10px;border-radius:999px;background:var(--rose-200);color:var(--slate-900);font-weight:600}
+.badge.alt{background:#e2e8f0}
+.stat{padding:6px 8px;border-radius:12px;border:1px solid var(--rose-200);background:white;min-width:120px;text-align:center}
+
+.row.gap{gap:8px}
+.panel{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap}
+.input{padding:6px 10px;border-radius:10px;border:1px solid var(--rose-300);}
+.number{width:80px}
+.small{font-size:12px;color:#475569}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{border-bottom:1px solid #f1f5f9;padding:6px 8px;text-align:left}
+hr{border:none;border-top:1px solid #f1f5f9;margin:12px 0}

@@ -1,0 +1,36 @@
+export type Player = 'W' | 'B';
+export type Phase = 'BIDDING' | 'PLACEMENT' | 'ASSIGN_STATS_W' | 'ASSIGN_STATS_B' | 'MOVEMENT' | 'ENDED';
+
+export type DirMask = number; // bits: 1=Right, 2=Left, 4=Up, 8=Down
+export const DIR = { R:1, L:2, U:4, D:8 } as const;
+
+export type Stone = {
+  id: string;
+  owner: Player;
+  r: number;
+  c: number;
+  d?: 1|2|3|4|5;
+  dirs?: DirMask;
+};
+
+export type Clocks = { W: number; B: number };
+export type Scores = { W: number; B: number };
+export type Credits = { W: number; B: number };
+
+export type Labels = { whiteHalf: number[][]; blackHalf: number[][] };
+
+export type GameState = {
+  seed: string;
+  board: (string|null)[][]; // stone id or null
+  stones: Record<string, Stone>;
+  turn: Player | null; // null before movement
+  phase: Phase;
+  lastPlacementBy?: Player;
+  credits: Credits;
+  clocks: Clocks; // milliseconds
+  scores: Scores;
+  bids: { W?: number; B?: number; revealed: boolean };
+  passesInARow: number;
+  labels: Labels;
+  winner?: Player | 'FLAG' | 'SCORE' | 'ELIM';
+};
