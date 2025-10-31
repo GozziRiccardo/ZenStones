@@ -67,6 +67,20 @@ export function squareCostForPlayer(state: GameState, player: Player, r: number,
   return labelForPlayerHalf(r, c, player, state.labels);
 }
 
+export function hasPlacementOption(state: GameState, player: Player): boolean {
+  if (state.placementCounts[player] >= 10) return false;
+  for (let r = 0; r < state.board.length; r++) {
+    for (let c = 0; c < state.board[r].length; c++) {
+      if (state.board[r][c]) continue;
+      const cost = squareCostForPlayer(state, player, r, c);
+      if (cost > 0 && state.credits[player] >= cost) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 let uid = 0;
 export function newId(){ uid += 1; return 'S'+uid; }
 export function resetIdCounter(){ uid = 0; }
