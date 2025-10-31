@@ -1,5 +1,12 @@
 export type Player = 'W' | 'B';
-export type Phase = 'BIDDING' | 'PLACEMENT' | 'ASSIGN_STATS_W' | 'ASSIGN_STATS_B' | 'MOVEMENT' | 'ENDED';
+export type Phase =
+  | 'BIDDING'
+  | 'PLACEMENT'
+  | 'ASSIGN_STATS_W'
+  | 'ASSIGN_STATS_B'
+  | 'MOVEMENT_BIDDING'
+  | 'MOVEMENT'
+  | 'ENDED';
 
 export type DirMask = number; // bits: 1=Right, 2=Left, 4=Up, 8=Down
 export const DIR = { R:1, L:2, U:4, D:8 } as const;
@@ -25,6 +32,21 @@ export type Labels = { whiteHalf: number[][]; blackHalf: number[][] };
 
 export type ScoreDetail = { credits: number; position: number; total: number };
 
+export type MovementBids = {
+  W?: number;
+  B?: number;
+  revealed: boolean;
+  winner?: Player;
+};
+
+export type MovementState = {
+  bids: MovementBids;
+  moveLimit?: number;
+  moveCount: number;
+  startingPlayer?: Player;
+  decider?: Player;
+};
+
 export type GameState = {
   seed: string;
   board: (string|null)[][]; // stone id or null
@@ -42,5 +64,5 @@ export type GameState = {
   labels: Labels;
   winner?: Player | 'FLAG' | 'SCORE' | 'ELIM';
   assignments: Record<Player, Record<string, Assignment>>;
-  pendingScoreVictory: Player | null;
+  movement: MovementState;
 };

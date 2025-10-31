@@ -8,7 +8,8 @@ import { BiddingPanel } from './panels/BiddingPanel';
 import { PlacementPanel } from './panels/PlacementPanel';
 import { AssignStatsPanel } from './panels/AssignStatsPanel';
 import { ScoresPanel } from './panels/ScoresPanel';
-import { createInitialState, gameReducer, getTickingMode, hasAnyLegalMove } from './game/state';
+import { MovementBiddingPanel } from './panels/MovementBiddingPanel';
+import { createInitialState, gameReducer, getTickingMode } from './game/state';
 import type { Assignment } from './game/types';
 
 const TICK_INTERVAL = 100;
@@ -61,15 +62,20 @@ export default function App() {
         const starter = state.bids.startingPlayer === 'B' ? 'Black' : 'White';
         pushToast(`Bids applied. ${starter} starts placement.`);
       }
+      if (state.phase === 'MOVEMENT_BIDDING') {
+        pushToast('Movement bidding begins.');
+      }
       if (state.phase === 'MOVEMENT' && prevPhase.current !== 'MOVEMENT') {
-        pushToast('Movement phase begins.');
+        const limit = state.movement.moveLimit;
+        const summary = limit !== undefined ? `${limit} move${limit === 1 ? '' : 's'}` : 'free movement';
+        pushToast(`Movement phase begins — limit: ${summary}.`);
       }
       if (state.phase === 'ENDED' && state.winner) {
         pushToast(`Game over — ${state.winner} wins.`);
       }
       prevPhase.current = state.phase;
     }
-  }, [state.phase, state.bids.startingPlayer, state.winner, pushToast]);
+  }, [state.phase, state.bids.startingPlayer, state.winner, state.movement.moveLimit, pushToast]);
 
   const prevRevealed = React.useRef(state.bids.revealed);
   React.useEffect(() => {
@@ -79,6 +85,15 @@ export default function App() {
     }
     prevRevealed.current = state.bids.revealed;
   }, [state.bids.revealed, state.bids.startingPlayer, pushToast]);
+
+  const prevMovementReveal = React.useRef(state.movement.bids.revealed);
+  React.useEffect(() => {
+    if (!prevMovementReveal.current && state.movement.bids.revealed) {
+      const chooser = state.movement.bids.winner === 'B' ? 'Black' : 'White';
+      pushToast(`Movement bids revealed. ${chooser} will set the plan.`);
+    }
+    prevMovementReveal.current = state.movement.bids.revealed;
+  }, [state.movement.bids.revealed, state.movement.bids.winner, pushToast]);
 
   React.useEffect(() => {
     if (!selectedId) return;
@@ -150,9 +165,17 @@ export default function App() {
     dispatch({ type: 'assignStats', player, assignments });
   };
 
-  const handleMovementSkip = () => {
+  const handleMovementBid = (player: Player, bid: number) => {
+    dispatch({ type: 'movementBid', player, bid });
+  };
+
+  const handleMovementPlan = (player: Player, moveLimit: number, startingPlayer: Player) => {
+    dispatch({ type: 'movementPlan', player, moveLimit, startingPlayer });
+  };
+
+  const handleMovementPass = () => {
     if (state.phase === 'MOVEMENT') {
-      dispatch({ type: 'movementSkip' });
+      dispatch({ type: 'movementPass' });
       setSelectedId(null);
     }
   };
@@ -164,9 +187,12 @@ export default function App() {
     }
   };
 
-  const canSkip = React.useMemo(() => {
+  const mustPass = React.useMemo(() => {
     if (state.phase !== 'MOVEMENT' || !state.turn) return false;
-    return !hasAnyLegalMove(state, state.turn);
+    return !Object.values(state.stones).some((stone) => {
+      if (stone.owner !== state.turn) return false;
+      return legalMoves(state, stone).length > 0;
+    });
   }, [state]);
 
   const tickingMode = getTickingMode(state);
@@ -222,14 +248,20 @@ export default function App() {
               onCommit={(assignments) => handleAssignCommit('B', assignments)}
             />
           )}
+          {state.phase === 'MOVEMENT_BIDDING' && (
+            <MovementBiddingPanel
+              state={state}
+              lockBid={handleMovementBid}
+              submitPlan={handleMovementPlan}
+            />
+          )}
           {state.phase === 'MOVEMENT' && (
             <div className="card movement-card">
-              <b>Movement:</b> Select one of your stones, then click a highlighted square. Captures remove both stones.
-              {canSkip ? (
-                <button className="btn outline" onClick={handleMovementSkip} style={{ marginTop: 8 }}>
-                  No legal moves — skip
-                </button>
-              ) : null}
+              <b>Movement:</b> Select one of your stones, then click a highlighted square. Captures remove both stones. You may also pass.
+              <button className="btn outline" onClick={handleMovementPass} style={{ marginTop: 8 }}>
+                {mustPass ? 'Pass (no moves available)' : 'Pass'}
+              </button>
+              {mustPass ? <div className="small" style={{ marginTop: 4 }}>You have no legal moves available.</div> : null}
             </div>
           )}
         </div>
