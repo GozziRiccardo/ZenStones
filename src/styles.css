@@ -45,7 +45,7 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,
 .square[data-cost]:hover{transform:translateY(-1px)}
 
 .stone-wrapper{position:relative;display:flex;align-items:center;justify-content:center;color:var(--slate-700)}
-.stone-wrapper svg{width:90%;height:90%;}
+.stone-wrapper svg{width:96%;height:96%;}
 .stone-wrapper.stone-white{color:var(--slate-700);}
 .stone-wrapper.stone-black{color:var(--rose-50);}
 .stone-wrapper.drop{animation:stone-drop 0.35s ease-out}

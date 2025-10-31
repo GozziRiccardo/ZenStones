@@ -6,7 +6,8 @@ type Dist = 1|2|3|4|5;
 type StoneIconProps = { d: Dist; color?: string; owner?: Player };
 
 export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
-  const size = 36, cx = 18, cy = 18, r = 12;
+  const size = 42, cx = size / 2, cy = size / 2, r = 14;
+  const viewBox = `0 0 ${size} ${size}`;
 
   const fill = owner === 'B'
     ? 'var(--slate-900)'
@@ -18,7 +19,7 @@ export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
       ? 'var(--rose-50)'
       : 'var(--slate-700)'
     : color;
-  const strokeWidth = 2.5;
+  const strokeWidth = 3;
 
   const poly = (n: number, rr = r) =>
     Array.from({ length: n }, (_, i) => {
@@ -30,14 +31,14 @@ export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
 
   if (d === 1) {
     return (
-      <svg width={size} height={size} viewBox="0 0 36 36">
+      <svg width={size} height={size} viewBox={viewBox}>
         <circle cx={cx} cy={cy} r={r} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
       </svg>
     );
   }
   if (d === 2) {
     return (
-      <svg width={size} height={size} viewBox="0 0 36 36">
+      <svg width={size} height={size} viewBox={viewBox}>
         {(() => {
           const doubleR = r - 3;
           const offset = doubleR;
@@ -53,31 +54,33 @@ export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
   }
   if (d === 3) {
     return (
-      <svg width={size} height={size} viewBox="0 0 36 36">
+      <svg width={size} height={size} viewBox={viewBox}>
         <polygon points={poly(3)} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
       </svg>
     );
   }
   if (d === 4) {
     return (
-      <svg width={size} height={size} viewBox="0 0 36 36">
+      <svg width={size} height={size} viewBox={viewBox}>
         <rect x={cx - r} y={cy - r} width={2*r} height={2*r} rx={3} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
       </svg>
     );
   }
   return (
-    <svg width={size} height={size} viewBox="0 0 36 36">
+    <svg width={size} height={size} viewBox={viewBox}>
       <polygon points={poly(5)} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
     </svg>
   );
 }
 
-export function DirArrows({ dirs, color='#facc15' }: { dirs:number; color?:string }){
+export function DirArrows({ dirs, color='#facc15', owner }: { dirs:number; color?:string; owner?: Player }){
+  const arrowColor = owner === 'W' ? '#ef4444' : color ?? '#facc15';
   const style: React.CSSProperties = {
     position:'absolute',
-    fontSize:14,
-    color,
-    textShadow: '0 0 2px rgba(15,23,42,0.65)'
+    fontSize:16,
+    fontWeight:700,
+    color: arrowColor,
+    textShadow: '0 0 5px rgba(15,23,42,0.85)'
   };
   return (
     <>
