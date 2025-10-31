@@ -59,8 +59,8 @@ export function Board({ state, onSquareClick, highlights = [], selectedId }: Boa
               data-cost={showCost ? tooltipCost : undefined}
             >
               {stone && (
-                <div className={`stone-wrapper${isNew ? ' drop' : ''}`}>
-                  <StoneIcon d={(stone.d||1) as any} />
+                <div className={`stone-wrapper ${stone.owner === 'B' ? 'stone-black' : 'stone-white'}${isNew ? ' drop' : ''}`}>
+                  <StoneIcon d={(stone.d||1) as any} owner={stone.owner} />
                   {stone.dirs ? <DirArrows dirs={stone.dirs} /> : null}
                 </div>
               )}
