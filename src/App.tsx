@@ -1,7 +1,7 @@
 import * as React from 'react';
 import './styles.css';
-import type { Player } from './game/types';
-import { legalMoves, squareCostForPlayer } from './game/utils';
+import type { Assignment, GameState, Player } from './game/types';
+import { legalMoves, squareCostForPlayer, restoreIdCounter } from './game/utils';
 import { Board } from './components/Board';
 import { HUD } from './components/HUD';
 import { BiddingPanel } from './panels/BiddingPanel';
@@ -10,14 +10,38 @@ import { AssignStatsPanel } from './panels/AssignStatsPanel';
 import { ScoresPanel } from './panels/ScoresPanel';
 import { MovementBiddingPanel } from './panels/MovementBiddingPanel';
 import { createInitialState, gameReducer, getTickingMode } from './game/state';
-import type { Assignment } from './game/types';
 
 const TICK_INTERVAL = 100;
+const STATE_STORAGE_KEY = 'zenstones-state';
+
+function loadPersistedState(): GameState | null {
+  if (typeof window === 'undefined' || !('localStorage' in window)) return null;
+  try {
+    const raw = window.localStorage.getItem(STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GameState | null;
+    if (!parsed) return null;
+    restoreIdCounter(parsed);
+    return parsed;
+  } catch (err) {
+    console.warn('Failed to load saved game state:', err);
+    try {
+      window.localStorage.removeItem(STATE_STORAGE_KEY);
+    } catch {
+      // ignore secondary errors removing corrupted state
+    }
+    return null;
+  }
+}
 
 type Toast = { id: number; message: string };
 
 export default function App() {
-  const [state, dispatch] = React.useReducer(gameReducer, undefined, createInitialState);
+  const [state, dispatch] = React.useReducer(
+    gameReducer,
+    undefined,
+    () => loadPersistedState() ?? createInitialState(),
+  );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
   const toastId = React.useRef(0);
@@ -54,6 +78,15 @@ export default function App() {
     }, TICK_INTERVAL);
     return () => window.clearInterval(id);
   }, []);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !('localStorage' in window)) return;
+    try {
+      window.localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+    } catch (err) {
+      console.warn('Failed to save game state:', err);
+    }
+  }, [state]);
 
   const prevPhase = React.useRef(state.phase);
   React.useEffect(() => {

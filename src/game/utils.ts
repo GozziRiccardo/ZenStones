@@ -70,3 +70,14 @@ export function squareCostForPlayer(state: GameState, player: Player, r: number,
 let uid = 0;
 export function newId(){ uid += 1; return 'S'+uid; }
 export function resetIdCounter(){ uid = 0; }
+
+export function restoreIdCounter(state: Pick<GameState, 'stones'>) {
+  let max = 0;
+  for (const id of Object.keys(state.stones)) {
+    const numeric = Number(id.replace(/^S/, ''));
+    if (!Number.isNaN(numeric)) {
+      max = Math.max(max, numeric);
+    }
+  }
+  uid = max;
+}
