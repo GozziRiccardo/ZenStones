@@ -384,9 +384,9 @@ export function getTickingMode(state: GameState): 'none' | 'both' | Player {
   }
 }
 
-function determineScoreWinner(state: GameState): Player {
+export function determineScoreWinner(state: GameState): Player {
   if (state.scores.W === state.scores.B) {
-    return state.movement.decider ?? 'W';
+    return 'B';
   }
   return state.scores.W > state.scores.B ? 'W' : 'B';
 }
