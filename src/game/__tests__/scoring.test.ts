@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeScoreDetails } from '../utils';
-import { createInitialState } from '../state';
+import { createInitialState, determineScoreWinner } from '../state';
 import type { Stone } from '../types';
 
 describe('computeScoreDetails', () => {
@@ -24,5 +24,19 @@ describe('computeScoreDetails', () => {
     expect(details.W.credits).toBe(80);
     expect(details.B.total).toBe(expectedBlack);
     expect(details.B.credits).toBe(75);
+  });
+});
+
+describe('determineScoreWinner', () => {
+  it('awards ties to black', () => {
+    const state = createInitialState();
+    state.scores = { W: 100, B: 100 };
+    expect(determineScoreWinner(state)).toBe('B');
+  });
+
+  it('still prefers the higher score', () => {
+    const state = createInitialState();
+    state.scores = { W: 101, B: 100 };
+    expect(determineScoreWinner(state)).toBe('W');
   });
 });
