@@ -55,6 +55,7 @@ export type GameState = {
   phase: Phase;
   lastPlacementBy?: Player;
   lastPlacementId?: string;
+  placementCounts: Record<Player, number>;
   credits: Credits;
   clocks: Clocks; // milliseconds
   scores: Scores;

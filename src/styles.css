@@ -78,6 +78,10 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,
 .small{font-size:12px;color:#475569}
 .table{width:100%;border-collapse:collapse}
 .table th,.table td{border-bottom:1px solid #f1f5f9;padding:6px 8px;text-align:left}
+.table tr.selected{background:rgba(244,63,94,0.08)}
+.stone-label{display:flex;flex-direction:column;line-height:1.2}
+.stone-label-name{font-weight:600;color:var(--slate-700)}
+.stone-label-id{font-size:11px;color:var(--slate-600)}
 hr{border:none;border-top:1px solid #f1f5f9;margin:12px 0}
 
 .locked-value{margin:8px 0;font-weight:600}

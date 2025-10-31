@@ -1,7 +1,7 @@
 import { makeLabels } from './labels';
 import type { Assignment, GameState, Player, Stone } from './types';
 import { DIR } from './types';
-import { emptyBoard, legalMoves, newId, recalcScores, resetIdCounter, squareCostForPlayer } from './utils';
+import { emptyBoard, hasPlacementOption, legalMoves, newId, recalcScores, resetIdCounter, squareCostForPlayer } from './utils';
 
 export type GameAction =
   | { type: 'reset' }
@@ -41,12 +41,20 @@ export function createInitialState(): GameState {
       bids: { revealed: false },
       moveCount: 0,
     },
+    placementCounts: { W: 0, B: 0 },
   };
   recalcScores(base);
   return base;
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
+  if (!state.placementCounts) {
+    const counts = { W: 0, B: 0 } as Record<Player, number>;
+    for (const stone of Object.values(state.stones)) {
+      counts[stone.owner] += 1;
+    }
+    state = { ...state, placementCounts: counts };
+  }
   switch (action.type) {
     case 'reset':
       return createInitialState();
@@ -122,6 +130,7 @@ function handleStartPlacement(state: GameState): GameState {
 function handlePlacement(state: GameState, r: number, c: number): GameState {
   if (state.phase !== 'PLACEMENT' || !state.turn) return state;
   if (state.board[r][c]) return state;
+  if (state.placementCounts[state.turn] >= 10) return state;
   const cost = squareCostForPlayer(state, state.turn, r, c);
   if (cost <= 0) return state;
   if (state.credits[state.turn] < cost) return state;
@@ -134,6 +143,7 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
   board[r][c] = id;
   credits[state.turn] -= cost;
   const nextTurn = state.turn === 'W' ? 'B' : 'W';
+  const placementCounts = { ...state.placementCounts, [state.turn]: state.placementCounts[state.turn] + 1 };
   const next: GameState = {
     ...state,
     stones,
@@ -143,6 +153,7 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
     lastPlacementBy: state.turn,
     lastPlacementId: id,
     passesInARow: 0,
+    placementCounts,
   };
   recalcScores(next);
   return next;
@@ -150,6 +161,11 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
 
 function handlePlacementPass(state: GameState): GameState {
   if (state.phase !== 'PLACEMENT' || !state.turn) return state;
+  const player = state.turn;
+  const placed = state.placementCounts[player];
+  if (placed < 1 && hasPlacementOption(state, player)) {
+    return state;
+  }
   const passes = state.passesInARow + 1;
   if (passes >= 2) {
     return endPlacement(state);

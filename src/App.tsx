@@ -1,7 +1,7 @@
 import * as React from 'react';
 import './styles.css';
 import type { Assignment, GameState, Player } from './game/types';
-import { legalMoves, squareCostForPlayer, restoreIdCounter } from './game/utils';
+import { legalMoves, squareCostForPlayer, restoreIdCounter, hasPlacementOption } from './game/utils';
 import { Board } from './components/Board';
 import { HUD } from './components/HUD';
 import { BiddingPanel } from './panels/BiddingPanel';
@@ -22,6 +22,13 @@ function loadPersistedState(): GameState | null {
     const parsed = JSON.parse(raw) as GameState | null;
     if (!parsed) return null;
     restoreIdCounter(parsed);
+    if (!parsed.placementCounts) {
+      const counts = { W: 0, B: 0 } as Record<Player, number>;
+      for (const stone of Object.values(parsed.stones ?? {})) {
+        counts[stone.owner] += 1;
+      }
+      parsed.placementCounts = counts;
+    }
     return parsed;
   } catch (err) {
     console.warn('Failed to load saved game state:', err);
@@ -43,6 +50,7 @@ export default function App() {
     () => loadPersistedState() ?? createInitialState(),
   );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
   const toastId = React.useRef(0);
   const lastTick = React.useRef<number>(Date.now());
@@ -131,10 +139,25 @@ export default function App() {
   React.useEffect(() => {
     if (!selectedId) return;
     const stone = state.stones[selectedId];
-    if (!stone || state.phase !== 'MOVEMENT' || stone.owner !== state.turn) {
+    if (!stone) {
       setSelectedId(null);
+      setSelectionSource(null);
+      return;
     }
-  }, [state.phase, state.turn, state.stones, selectedId]);
+    if (selectionSource === 'movement') {
+      if (state.phase !== 'MOVEMENT' || stone.owner !== state.turn) {
+        setSelectedId(null);
+        setSelectionSource(null);
+      }
+    } else if (selectionSource === 'assign') {
+      const expectedPlayer = state.phase === 'ASSIGN_STATS_W' ? 'W'
+        : state.phase === 'ASSIGN_STATS_B' ? 'B' : null;
+      if (!expectedPlayer || stone.owner !== expectedPlayer) {
+        setSelectedId(null);
+        setSelectionSource(null);
+      }
+    }
+  }, [state.phase, state.turn, state.stones, selectedId, selectionSource]);
 
   const selectedMoves = React.useMemo(() => {
     if (!selectedId) return [] as { r: number; c: number }[];
@@ -147,6 +170,10 @@ export default function App() {
   const handlePlacementSquare = (r: number, c: number) => {
     if (state.phase !== 'PLACEMENT' || !state.turn) return;
     if (state.board[r][c]) return;
+    if (state.placementCounts[state.turn] >= 10) {
+      pushToast('You have already placed ten stones this phase.');
+      return;
+    }
     const cost = squareCostForPlayer(state, state.turn, r, c);
     if (cost <= 0) return;
     if (state.credits[state.turn] < cost) {
@@ -162,10 +189,12 @@ export default function App() {
     if (selectedId) {
       if (!selectedMoves.some((m) => m.r === r && m.c === c)) {
         setSelectedId(null);
+        setSelectionSource(null);
         return;
       }
       dispatch({ type: 'movementMove', stoneId: selectedId, r, c });
       setSelectedId(null);
+      setSelectionSource(null);
       return;
     }
     if (!targetId) return;
@@ -177,6 +206,7 @@ export default function App() {
       return;
     }
     setSelectedId(stone.id);
+    setSelectionSource('movement');
   };
 
   const onSquareClick = (r: number, c: number) => {
@@ -192,10 +222,22 @@ export default function App() {
   };
 
   const handleStartPlacement = () => dispatch({ type: 'startPlacement' });
-  const handlePlacementPass = () => dispatch({ type: 'placementPass' });
+  const handlePlacementPass = () => {
+    if (state.phase !== 'PLACEMENT' || !state.turn) return;
+    const player = state.turn;
+    const placed = state.placementCounts[player];
+    const canPlace = hasPlacementOption(state, player);
+    if (placed < 1 && canPlace) {
+      pushToast('You must place at least one stone before passing.');
+      return;
+    }
+    dispatch({ type: 'placementPass' });
+  };
 
   const handleAssignCommit = (player: Player, assignments: Record<string, Assignment>) => {
     dispatch({ type: 'assignStats', player, assignments });
+    setSelectedId(null);
+    setSelectionSource(null);
   };
 
   const handleMovementBid = (player: Player, bid: number) => {
@@ -206,10 +248,16 @@ export default function App() {
     dispatch({ type: 'movementPlan', player, moveLimit, startingPlayer });
   };
 
+  const handleAssignFocus = (stoneId: string | null) => {
+    setSelectedId(stoneId);
+    setSelectionSource(stoneId ? 'assign' : null);
+  };
+
   const handleMovementPass = () => {
     if (state.phase === 'MOVEMENT') {
       dispatch({ type: 'movementPass' });
       setSelectedId(null);
+      setSelectionSource(null);
     }
   };
 
@@ -217,6 +265,7 @@ export default function App() {
     if (window.confirm('Start a new game and reset all progress?')) {
       dispatch({ type: 'reset' });
       setSelectedId(null);
+      setSelectionSource(null);
     }
   };
 
@@ -272,6 +321,8 @@ export default function App() {
               state={state}
               player="W"
               onCommit={(assignments) => handleAssignCommit('W', assignments)}
+              onFocusStone={handleAssignFocus}
+              focusedStoneId={selectionSource === 'assign' ? selectedId : null}
             />
           )}
           {state.phase === 'ASSIGN_STATS_B' && (
@@ -279,6 +330,8 @@ export default function App() {
               state={state}
               player="B"
               onCommit={(assignments) => handleAssignCommit('B', assignments)}
+              onFocusStone={handleAssignFocus}
+              focusedStoneId={selectionSource === 'assign' ? selectedId : null}
             />
           )}
           {state.phase === 'MOVEMENT_BIDDING' && (
