@@ -61,7 +61,7 @@ export function Board({ state, onSquareClick, highlights = [], selectedId }: Boa
               {stone && (
                 <div className={`stone-wrapper ${stone.owner === 'B' ? 'stone-black' : 'stone-white'}${isNew ? ' drop' : ''}`}>
                   <StoneIcon d={(stone.d||1) as any} owner={stone.owner} />
-                  {stone.dirs ? <DirArrows dirs={stone.dirs} /> : null}
+                  {stone.dirs ? <DirArrows dirs={stone.dirs} owner={stone.owner} /> : null}
                 </div>
               )}
               <div className="label">{label?label:''}</div>
