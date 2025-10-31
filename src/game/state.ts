@@ -1,7 +1,7 @@
 import { makeLabels } from './labels';
 import type { Assignment, GameState, Player, Stone } from './types';
 import { DIR } from './types';
-import { emptyBoard, legalMoves, newId, recalcScores, resetIdCounter, squareCostForPlayer } from './utils';
+import { emptyBoard, hasAnyLegalMove, legalMoves, newId, recalcScores, resetIdCounter, squareCostForPlayer } from './utils';
 
 export type GameAction =
   | { type: 'reset' }
@@ -35,6 +35,7 @@ export function createInitialState(): GameState {
     passesInARow: 0,
     labels,
     assignments: { W: {}, B: {} },
+    pendingScoreVictory: null,
   };
   recalcScores(base);
   return base;
@@ -219,7 +220,9 @@ function handleMovementMove(state: GameState, stoneId: string, r: number, c: num
     board[r][c] = stone.id;
     lastPlacementId = undefined;
   }
-  const nextTurn = state.turn === 'W' ? 'B' : 'W';
+  const player = state.turn;
+  const opponent = player === 'W' ? 'B' : 'W';
+  const nextTurn = opponent;
   const next: GameState = {
     ...state,
     stones,
@@ -228,17 +231,61 @@ function handleMovementMove(state: GameState, stoneId: string, r: number, c: num
     lastPlacementId,
   };
   recalcScores(next);
+
   const anyW = Object.values(stones).some(s => s.owner === 'W');
   const anyB = Object.values(stones).some(s => s.owner === 'B');
   if (!anyW || !anyB) {
     next.phase = 'ENDED';
     next.winner = anyW ? 'W' : 'B';
+    next.pendingScoreVictory = null;
     return next;
   }
-  if (next.scores.W >= 100 || next.scores.B >= 100) {
+
+  const hasMoveW = hasAnyLegalMove(next, 'W');
+  const hasMoveB = hasAnyLegalMove(next, 'B');
+  if (!hasMoveW && hasMoveB) {
     next.phase = 'ENDED';
-    next.winner = next.scores.W === next.scores.B ? state.turn! : next.scores.W > next.scores.B ? 'W' : 'B';
+    next.winner = 'B';
+    next.pendingScoreVictory = null;
+    return next;
   }
+  if (!hasMoveB && hasMoveW) {
+    next.phase = 'ENDED';
+    next.winner = 'W';
+    next.pendingScoreVictory = null;
+    return next;
+  }
+  if (!hasMoveW && !hasMoveB) {
+    next.phase = 'ENDED';
+    next.winner = next.scores.W === next.scores.B ? player : next.scores.W > next.scores.B ? 'W' : 'B';
+    next.pendingScoreVictory = null;
+    return next;
+  }
+
+  let pending = state.pendingScoreVictory;
+  if (pending && next.scores[pending] < 100) {
+    pending = null;
+  }
+  if (!pending && next.scores[player] >= 100) {
+    pending = player;
+  }
+
+  if (pending && player !== pending) {
+    if (next.scores[player] > next.scores[pending]) {
+      next.phase = 'ENDED';
+      next.winner = player;
+      next.pendingScoreVictory = null;
+      return next;
+    }
+    if (next.scores[pending] >= 100) {
+      next.phase = 'ENDED';
+      next.winner = pending;
+      next.pendingScoreVictory = null;
+      return next;
+    }
+  }
+
+  next.pendingScoreVictory = pending ?? null;
   return next;
 }
 
@@ -246,11 +293,20 @@ function handleMovementSkip(state: GameState): GameState {
   if (state.phase !== 'MOVEMENT' || !state.turn) return state;
   const player = state.turn;
   if (hasAnyLegalMove(state, player)) return state;
-  // TODO: Confirm final handling of stalemate/skip rule.
-  return {
+  const opponent = player === 'W' ? 'B' : 'W';
+  const opponentHasMove = hasAnyLegalMove(state, opponent);
+  const next: GameState = {
     ...state,
-    turn: player === 'W' ? 'B' : 'W',
+    pendingScoreVictory: null,
   };
+  if (opponentHasMove) {
+    next.phase = 'ENDED';
+    next.winner = opponent;
+    return next;
+  }
+  next.phase = 'ENDED';
+  next.winner = state.scores.W === state.scores.B ? player : state.scores.W > state.scores.B ? 'W' : 'B';
+  return next;
 }
 
 export function calculateAssignmentCost(assignments: Record<string, Assignment>): number {

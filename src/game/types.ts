@@ -42,4 +42,5 @@ export type GameState = {
   labels: Labels;
   winner?: Player | 'FLAG' | 'SCORE' | 'ELIM';
   assignments: Record<Player, Record<string, Assignment>>;
+  pendingScoreVictory: Player | null;
 };
