@@ -28,6 +28,20 @@ export function HUD({ state, tickingMode }: { state: GameState; tickingMode: Mod
     return classes.join(' ');
   };
 
+  const showMoveStats =
+    state.phase === 'MOVEMENT' ||
+    state.phase === 'MOVEMENT_BIDDING' ||
+    state.movement.moveCount > 0 ||
+    state.movement.moveLimit !== undefined;
+  const moveLabel = (() => {
+    const limit = state.movement.moveLimit;
+    const count = state.movement.moveCount;
+    if (limit !== undefined) {
+      return `${count} / ${limit}`;
+    }
+    return `${count}`;
+  })();
+
   return (
     <div className="hud">
       <div className="badge phase">Phase: {state.phase}</div>
@@ -36,6 +50,9 @@ export function HUD({ state, tickingMode }: { state: GameState; tickingMode: Mod
       <div className="stat">Credits B: <b>{state.credits.B}</b></div>
       <div className="stat">Score W: <b>{state.scores.W}</b></div>
       <div className="stat">Score B: <b>{state.scores.B}</b></div>
+      {showMoveStats ? (
+        <div className="stat">Moves: <b>{moveLabel}</b></div>
+      ) : null}
       <div className={timerClass('W')}>Clock W: <b>{fmt(state.clocks.W)}</b></div>
       <div className={timerClass('B')}>Clock B: <b>{fmt(state.clocks.B)}</b></div>
     </div>

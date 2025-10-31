@@ -24,6 +24,7 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,
 .btn:hover{background:var(--rose-400)}
 .btn.outline{background:white;color:var(--rose-500);border:1px solid var(--rose-300)}
 .btn.outline:hover{background:var(--rose-100)}
+.btn.outline.active{background:var(--rose-200);border-color:var(--rose-400)}
 
 .grid{display:grid;gap:2px}
 .board{position:relative;aspect-ratio:1/1;width:min(90vw,700px);background:var(--rose-200);border-radius:16px;overflow:hidden;border:1px solid var(--rose-300)}

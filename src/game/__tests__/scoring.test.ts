@@ -16,8 +16,8 @@ describe('computeScoreDetails', () => {
 
     const labelForWhite = state.labels.blackHalf[whiteStone.r][whiteStone.c];
     const labelForBlack = state.labels.whiteHalf[blackStone.r][blackStone.c];
-    const expectedWhite = 80 + (labelForWhite ? 51 - labelForWhite : 0);
-    const expectedBlack = 75 + (labelForBlack ? 51 - labelForBlack : 0);
+    const expectedWhite = 80 + (labelForWhite ? labelForWhite : 0);
+    const expectedBlack = 75 + (labelForBlack ? labelForBlack : 0);
 
     const details = computeScoreDetails(state);
     expect(details.W.total).toBe(expectedWhite);

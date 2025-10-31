@@ -53,7 +53,7 @@ export function computeScoreDetails(state: GameState): Record<Player, ScoreDetai
     const s = state.stones[id];
     const label = labelForOpponentHalf(s.r, s.c, s.owner, state.labels);
     if (label>0) {
-      const pts = 51 - label;
+      const pts = label;
       if (s.owner === 'W') bonusW += pts; else bonusB += pts;
     }
   }

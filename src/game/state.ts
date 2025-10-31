@@ -1,7 +1,7 @@
 import { makeLabels } from './labels';
 import type { Assignment, GameState, Player, Stone } from './types';
 import { DIR } from './types';
-import { emptyBoard, hasAnyLegalMove, legalMoves, newId, recalcScores, resetIdCounter, squareCostForPlayer } from './utils';
+import { emptyBoard, legalMoves, newId, recalcScores, resetIdCounter, squareCostForPlayer } from './utils';
 
 export type GameAction =
   | { type: 'reset' }
@@ -11,8 +11,10 @@ export type GameAction =
   | { type: 'placementSquare'; r: number; c: number }
   | { type: 'placementPass' }
   | { type: 'assignStats'; player: Player; assignments: Record<string, Assignment> }
+  | { type: 'movementBid'; player: Player; bid: number }
+  | { type: 'movementPlan'; player: Player; moveLimit: number; startingPlayer: Player }
   | { type: 'movementMove'; stoneId: string; r: number; c: number }
-  | { type: 'movementSkip' };
+  | { type: 'movementPass' };
 
 export function createInitialState(): GameState {
   resetIdCounter();
@@ -35,7 +37,10 @@ export function createInitialState(): GameState {
     passesInARow: 0,
     labels,
     assignments: { W: {}, B: {} },
-    pendingScoreVictory: null,
+    movement: {
+      bids: { revealed: false },
+      moveCount: 0,
+    },
   };
   recalcScores(base);
   return base;
@@ -57,10 +62,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return handlePlacementPass(state);
     case 'assignStats':
       return handleAssignStats(state, action.player, action.assignments);
+    case 'movementBid':
+      return handleMovementBid(state, action.player, action.bid);
+    case 'movementPlan':
+      return handleMovementPlan(state, action.player, action.moveLimit, action.startingPlayer);
     case 'movementMove':
       return handleMovementMove(state, action.stoneId, action.r, action.c);
-    case 'movementSkip':
-      return handleMovementSkip(state);
+    case 'movementPass':
+      return handleMovementPass(state);
     default:
       return state;
   }
@@ -192,10 +201,77 @@ function handleAssignStats(state: GameState, player: Player, assignments: Record
     recalcScores(base);
     return base;
   }
-  base.phase = 'MOVEMENT';
-  base.turn = state.lastPlacementBy === 'W' ? 'B' : 'W';
+  base.phase = 'MOVEMENT_BIDDING';
+  base.turn = null;
+  base.passesInARow = 0;
+  base.movement = {
+    bids: { revealed: false },
+    moveCount: 0,
+  };
   recalcScores(base);
   return base;
+}
+
+function handleMovementBid(state: GameState, player: Player, bid: number): GameState {
+  if (state.phase !== 'MOVEMENT_BIDDING') return state;
+  if (state.movement.bids[player] !== undefined) return state;
+  const value = clamp(bid, 0, state.credits[player]);
+  const bids = { ...state.movement.bids, [player]: value };
+  const next: GameState = {
+    ...state,
+    movement: {
+      ...state.movement,
+      bids,
+    },
+  };
+  const wBid = bids.W;
+  const bBid = bids.B;
+  if (typeof wBid === 'number' && typeof bBid === 'number' && !bids.revealed) {
+    const winner = wBid === bBid ? 'W' : wBid > bBid ? 'W' : 'B';
+    const credits = { ...state.credits };
+    credits[winner] = Math.max(0, credits[winner] - (winner === 'W' ? wBid : bBid));
+    const updatedBids = { ...bids, revealed: true, winner };
+    const movement = {
+      ...state.movement,
+      bids: updatedBids,
+      decider: winner,
+    };
+    const result: GameState = {
+      ...state,
+      credits,
+      movement,
+    };
+    recalcScores(result);
+    return result;
+  }
+  return next;
+}
+
+function handleMovementPlan(
+  state: GameState,
+  player: Player,
+  moveLimit: number,
+  startingPlayer: Player,
+): GameState {
+  if (state.phase !== 'MOVEMENT_BIDDING') return state;
+  if (!state.movement.bids.revealed) return state;
+  if (state.movement.bids.winner !== player) return state;
+  const limit = Math.max(1, Math.floor(moveLimit));
+  const movement = {
+    ...state.movement,
+    moveLimit: limit,
+    moveCount: 0,
+    startingPlayer,
+    decider: player,
+  };
+  const next: GameState = {
+    ...state,
+    movement,
+    phase: 'MOVEMENT',
+    turn: startingPlayer,
+    passesInARow: 0,
+  };
+  return next;
 }
 
 function handleMovementMove(state: GameState, stoneId: string, r: number, c: number): GameState {
@@ -223,89 +299,48 @@ function handleMovementMove(state: GameState, stoneId: string, r: number, c: num
   const player = state.turn;
   const opponent = player === 'W' ? 'B' : 'W';
   const nextTurn = opponent;
+  const moveCount = state.movement.moveCount + 1;
+  const nextMovement = {
+    ...state.movement,
+    moveCount,
+  };
   const next: GameState = {
     ...state,
     stones,
     board,
     turn: nextTurn,
     lastPlacementId,
+    passesInARow: 0,
+    movement: nextMovement,
   };
   recalcScores(next);
 
-  const anyW = Object.values(stones).some(s => s.owner === 'W');
-  const anyB = Object.values(stones).some(s => s.owner === 'B');
-  if (!anyW || !anyB) {
+  const limit = state.movement.moveLimit;
+  if (limit !== undefined && moveCount >= limit) {
     next.phase = 'ENDED';
-    next.winner = anyW ? 'W' : 'B';
-    next.pendingScoreVictory = null;
-    return next;
+    next.turn = null;
+    const winner = determineScoreWinner(next);
+    next.winner = winner;
   }
-
-  const hasMoveW = hasAnyLegalMove(next, 'W');
-  const hasMoveB = hasAnyLegalMove(next, 'B');
-  if (!hasMoveW && hasMoveB) {
-    next.phase = 'ENDED';
-    next.winner = 'B';
-    next.pendingScoreVictory = null;
-    return next;
-  }
-  if (!hasMoveB && hasMoveW) {
-    next.phase = 'ENDED';
-    next.winner = 'W';
-    next.pendingScoreVictory = null;
-    return next;
-  }
-  if (!hasMoveW && !hasMoveB) {
-    next.phase = 'ENDED';
-    next.winner = next.scores.W === next.scores.B ? player : next.scores.W > next.scores.B ? 'W' : 'B';
-    next.pendingScoreVictory = null;
-    return next;
-  }
-
-  let pending = state.pendingScoreVictory;
-  if (pending && next.scores[pending] < 100) {
-    pending = null;
-  }
-  if (!pending && next.scores[player] >= 100) {
-    pending = player;
-  }
-
-  if (pending && player !== pending) {
-    if (next.scores[player] > next.scores[pending]) {
-      next.phase = 'ENDED';
-      next.winner = player;
-      next.pendingScoreVictory = null;
-      return next;
-    }
-    if (next.scores[pending] >= 100) {
-      next.phase = 'ENDED';
-      next.winner = pending;
-      next.pendingScoreVictory = null;
-      return next;
-    }
-  }
-
-  next.pendingScoreVictory = pending ?? null;
   return next;
 }
 
-function handleMovementSkip(state: GameState): GameState {
+function handleMovementPass(state: GameState): GameState {
   if (state.phase !== 'MOVEMENT' || !state.turn) return state;
   const player = state.turn;
-  if (hasAnyLegalMove(state, player)) return state;
   const opponent = player === 'W' ? 'B' : 'W';
-  const opponentHasMove = hasAnyLegalMove(state, opponent);
+  const passes = state.passesInARow + 1;
   const next: GameState = {
     ...state,
-    pendingScoreVictory: null,
+    turn: opponent,
+    passesInARow: passes >= 2 ? 0 : passes,
   };
-  if (opponentHasMove) {
+  if (passes >= 2) {
+    recalcScores(next);
     next.phase = 'ENDED';
-    next.winner = opponent;
-    return next;
+    next.turn = null;
+    next.winner = determineScoreWinner(next);
   }
-  next.phase = 'ENDED';
-  next.winner = state.scores.W === state.scores.B ? player : state.scores.W > state.scores.B ? 'W' : 'B';
   return next;
 }
 
@@ -334,6 +369,8 @@ export function getTickingMode(state: GameState): 'none' | 'both' | Player {
   switch (state.phase) {
     case 'BIDDING':
       return state.bids.revealed ? 'none' : 'both';
+    case 'MOVEMENT_BIDDING':
+      return state.movement.bids.revealed ? 'none' : 'both';
     case 'PLACEMENT':
       return state.turn ?? 'none';
     case 'ASSIGN_STATS_W':
@@ -345,6 +382,13 @@ export function getTickingMode(state: GameState): 'none' | 'both' | Player {
     default:
       return 'none';
   }
+}
+
+function determineScoreWinner(state: GameState): Player {
+  if (state.scores.W === state.scores.B) {
+    return state.movement.decider ?? 'W';
+  }
+  return state.scores.W > state.scores.B ? 'W' : 'B';
 }
 
 function clamp(n: number, min: number, max: number): number {
