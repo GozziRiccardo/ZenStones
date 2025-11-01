@@ -1,5 +1,6 @@
 import * as React from 'react';
 import type { GameState } from '../game/types';
+import { squareCostForPlayer } from '../game/utils';
 import { StoneIcon, DirArrows } from './StoneIcon';
 
 type BoardProps = {
@@ -36,14 +37,14 @@ export function Board({ state, onSquareClick, highlights = [], selectedId }: Boa
           const label = r < mid ? blackLabel : whiteLabel;
           sqClasses.push(r < mid ? 'half-black' : 'half-white');
           if (state.phase === 'PLACEMENT') {
-            const activeHalf = state.turn === 'W' ? r >= mid : r < mid;
-            sqClasses.push(activeHalf ? 'active-half' : 'inactive-half');
+            const active = state.turn ? squareCostForPlayer(state, state.turn, r, c) > 0 : false;
+            sqClasses.push(active ? 'active-half' : 'inactive-half');
           }
           if (selectedId && id === selectedId) {
             sqClasses.push('selected');
           }
-          const costForWhite = whiteLabel;
-          const costForBlack = blackLabel;
+          const costForWhite = squareCostForPlayer(state, 'W', r, c);
+          const costForBlack = squareCostForPlayer(state, 'B', r, c);
           const tooltipCost = state.phase === 'PLACEMENT'
             ? state.turn === 'W'
               ? costForWhite

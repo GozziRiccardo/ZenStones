@@ -20,7 +20,7 @@ Implement a local, hot-seat prototype of ZenStones with full rules and UI. Onlin
 
 ### 2. Placement (Alternating)
 
-- The board is split into two halves of 50 squares. Each player places stones only within their half.
+- The board is split into two halves of 50 squares. Each player may place stones in their half. When a square is claimed, the mirrored square with the same label in the opponent half unlocks for that opponent for future placements.
 - Each half is labeled **1–50** (from that player’s perspective):
   - 1 is bottom-left; 10 is bottom-right.
   - 11 is above 10; 50 is top-right.

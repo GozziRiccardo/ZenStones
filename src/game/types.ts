@@ -66,4 +66,5 @@ export type GameState = {
   winner?: Player | 'FLAG' | 'SCORE' | 'ELIM';
   assignments: Record<Player, Record<string, Assignment>>;
   movement: MovementState;
+  unlockedLabels: Record<Player, Record<number, true>>;
 };

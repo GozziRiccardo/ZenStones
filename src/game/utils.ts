@@ -64,7 +64,16 @@ export function computeScoreDetails(state: GameState): Record<Player, ScoreDetai
 }
 
 export function squareCostForPlayer(state: GameState, player: Player, r: number, c: number): number {
-  return labelForPlayerHalf(r, c, player, state.labels);
+  const base = labelForPlayerHalf(r, c, player, state.labels);
+  if (base > 0) {
+    return base;
+  }
+  const opponent = player === 'W' ? 'B' : 'W';
+  const opponentLabel = labelForPlayerHalf(r, c, opponent, state.labels);
+  if (opponentLabel > 0 && state.unlockedLabels[player]?.[opponentLabel]) {
+    return opponentLabel;
+  }
+  return 0;
 }
 
 export function hasPlacementOption(state: GameState, player: Player): boolean {

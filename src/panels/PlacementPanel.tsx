@@ -14,8 +14,7 @@ export function PlacementPanel({ state, onPass }:{ state: GameState; onPass: ()=
   return (
     <div className="panel">
       <div className="card">
-        <b>Placement:</b> {active} to move. Hover squares to preview the credit cost — you can only play in your half.
-        Two consecutive passes end placement.
+        <b>Placement:</b> {active} to move. Hover squares to preview the credit cost — your half is always available, and the matching square in the opponent half unlocks once they claim its number. Two consecutive passes end placement.
         <div className="small" style={{ marginTop: 4 }}>Stones placed — {infoLine}</div>
         {maxReached ? (
           <div className="small" style={{ marginTop: 4 }}>
