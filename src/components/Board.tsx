@@ -1,5 +1,5 @@
 import * as React from 'react';
-import type { GameState } from '../game/types';
+import type { Dist, GameState } from '../game/types';
 import { squareCostForPlayer } from '../game/utils';
 import { StoneIcon, DirArrows } from './StoneIcon';
 
@@ -68,8 +68,8 @@ export function Board({ state, onSquareClick, highlights = [], selectedId }: Boa
                 <div
                   className={`stone-wrapper ${stone.owner === 'B' ? 'stone-black' : 'stone-white'}${isNew ? ' drop' : ''}`}
                 >
-                  <StoneIcon d={(stone.d||1) as any} owner={stone.owner} persistent={stone.persistent} />
-                  {stone.dirs ? <DirArrows dirs={stone.dirs} owner={stone.owner} /> : null}
+                  <StoneIcon d={(stone.d ?? 1) as Dist} owner={stone.owner} persistent={stone.persistent} />
+                  {stone.dirs ? <DirArrows d={(stone.d ?? 1) as Dist} dirs={stone.dirs} owner={stone.owner} /> : null}
                 </div>
               )}
               <div className="label">{label?label:''}</div>
