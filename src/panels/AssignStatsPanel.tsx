@@ -133,15 +133,15 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                 </td>
                 <td className="dir-cell">
                   <div className="dir-grid">
-                    <DirCheckbox label="↖" checked={!!(dirs & DIR.UL)} onChange={()=>toggleDir(s.id, DIR.UL)} onFocus={()=>onFocusStone?.(s.id)} />
-                    <DirCheckbox label="↑" checked={!!(dirs & DIR.U)} onChange={()=>toggleDir(s.id, DIR.U)} onFocus={()=>onFocusStone?.(s.id)} />
-                    <DirCheckbox label="↗" checked={!!(dirs & DIR.UR)} onChange={()=>toggleDir(s.id, DIR.UR)} onFocus={()=>onFocusStone?.(s.id)} />
-                    <DirCheckbox label="←" checked={!!(dirs & DIR.L)} onChange={()=>toggleDir(s.id, DIR.L)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="↖" checked={!!(dirs & DIR.UL)} onChange={()=>toggleDir(s.id, DIR.UL)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox label="↑" checked={!!(dirs & DIR.U)} onChange={()=>toggleDir(s.id, DIR.U)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox label="↗" checked={!!(dirs & DIR.UR)} onChange={()=>toggleDir(s.id, DIR.UR)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox label="←" checked={!!(dirs & DIR.L)} onChange={()=>toggleDir(s.id, DIR.L)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
                     <div className="dir-center" />
-                    <DirCheckbox label="→" checked={!!(dirs & DIR.R)} onChange={()=>toggleDir(s.id, DIR.R)} onFocus={()=>onFocusStone?.(s.id)} />
-                    <DirCheckbox label="↙" checked={!!(dirs & DIR.DL)} onChange={()=>toggleDir(s.id, DIR.DL)} onFocus={()=>onFocusStone?.(s.id)} />
-                    <DirCheckbox label="↓" checked={!!(dirs & DIR.D)} onChange={()=>toggleDir(s.id, DIR.D)} onFocus={()=>onFocusStone?.(s.id)} />
-                    <DirCheckbox label="↘" checked={!!(dirs & DIR.DR)} onChange={()=>toggleDir(s.id, DIR.DR)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="→" checked={!!(dirs & DIR.R)} onChange={()=>toggleDir(s.id, DIR.R)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox label="↙" checked={!!(dirs & DIR.DL)} onChange={()=>toggleDir(s.id, DIR.DL)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox label="↓" checked={!!(dirs & DIR.D)} onChange={()=>toggleDir(s.id, DIR.D)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox label="↘" checked={!!(dirs & DIR.DR)} onChange={()=>toggleDir(s.id, DIR.DR)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
                   </div>
                   <div className="persistence-toggle">
                     <DirCheckbox
@@ -165,10 +165,11 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
   );
 }
 
-function DirCheckbox({ label, checked, onChange, onFocus }:{ label:string; checked:boolean; onChange:()=>void; onFocus?:()=>void }){
+function DirCheckbox({ label, checked, onChange, onFocus, hideBox }:{ label:React.ReactNode; checked:boolean; onChange:()=>void; onFocus?:()=>void; hideBox?:boolean }){
   return (
-    <label className="dir-check">
-      <input type="checkbox" checked={checked} onChange={onChange} onFocus={onFocus} /> {label}
+    <label className={`dir-check${hideBox ? ' hide-box' : ''}`}>
+      <input type="checkbox" checked={checked} onChange={onChange} onFocus={onFocus} />
+      {hideBox ? <span className="dir-symbol">{label}</span> : label}
     </label>
   );
 }
