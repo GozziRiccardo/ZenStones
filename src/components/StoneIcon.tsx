@@ -20,8 +20,8 @@ export function StoneIcon({ d, color='currentColor', owner, persistent }: StoneI
       : 'none';
   const stroke = owner
     ? owner === 'B'
-      ? 'var(--rose-50)'
-      : 'var(--slate-700)'
+      ? persistent ? '#facc15' : 'var(--rose-50)'
+      : persistent ? '#ef4444' : 'var(--slate-700)'
     : color;
   const highlightStroke = persistent
     ? owner === 'W'
@@ -89,37 +89,88 @@ export function StoneIcon({ d, color='currentColor', owner, persistent }: StoneI
 export function DirArrows({ dirs, color='#facc15', owner }: { dirs:number; color?:string; owner?: Player }){
   const arrowColor = owner === 'W' ? '#ef4444' : color ?? '#facc15';
   const shadowColor = 'rgba(15,23,42,0.78)';
-  const baseFontSize = 28;
-  const diagonalFontSize = 24;
-  const items: { bit: number; label: string; x: number; y: number; fontSize: number }[] = [
-    { bit: DIR.R, label: '→', x: 74, y: 50, fontSize: baseFontSize },
-    { bit: DIR.L, label: '←', x: 26, y: 50, fontSize: baseFontSize },
-    { bit: DIR.U, label: '↑', x: 50, y: 26, fontSize: baseFontSize },
-    { bit: DIR.D, label: '↓', x: 50, y: 74, fontSize: baseFontSize },
-    { bit: DIR.UR, label: '↗', x: 72, y: 30, fontSize: diagonalFontSize },
-    { bit: DIR.UL, label: '↖', x: 28, y: 30, fontSize: diagonalFontSize },
-    { bit: DIR.DR, label: '↘', x: 72, y: 70, fontSize: diagonalFontSize },
-    { bit: DIR.DL, label: '↙', x: 28, y: 70, fontSize: diagonalFontSize },
+  const cx = 50;
+  const cy = 50;
+  const startOffset = 8;
+  const shaftLength = 22;
+  const headLength = 10;
+  const headWidth = 12;
+  const strokeWidth = 6;
+  const shadowStrokeWidth = strokeWidth + 3;
+  const arrowDefs: { bit: number; vx: number; vy: number }[] = [
+    { bit: DIR.R, vx: 1, vy: 0 },
+    { bit: DIR.L, vx: -1, vy: 0 },
+    { bit: DIR.U, vx: 0, vy: -1 },
+    { bit: DIR.D, vx: 0, vy: 1 },
+    { bit: DIR.UR, vx: 1, vy: -1 },
+    { bit: DIR.UL, vx: -1, vy: -1 },
+    { bit: DIR.DR, vx: 1, vy: 1 },
+    { bit: DIR.DL, vx: -1, vy: 1 },
   ];
+
+  const makeArrow = ({ vx, vy }: { vx: number; vy: number }) => {
+    const mag = Math.hypot(vx, vy) || 1;
+    const dirX = vx / mag;
+    const dirY = vy / mag;
+    const startX = cx + dirX * startOffset;
+    const startY = cy + dirY * startOffset;
+    const baseX = cx + dirX * (startOffset + shaftLength);
+    const baseY = cy + dirY * (startOffset + shaftLength);
+    const tipX = cx + dirX * (startOffset + shaftLength + headLength);
+    const tipY = cy + dirY * (startOffset + shaftLength + headLength);
+    const perpX = -dirY;
+    const perpY = dirX;
+    const leftX = baseX + perpX * (headWidth / 2);
+    const leftY = baseY + perpY * (headWidth / 2);
+    const rightX = baseX - perpX * (headWidth / 2);
+    const rightY = baseY - perpY * (headWidth / 2);
+    return {
+      startX,
+      startY,
+      baseX,
+      baseY,
+      tipX,
+      tipY,
+      leftX,
+      leftY,
+      rightX,
+      rightY,
+    };
+  };
+
   return (
     <svg className="stone-arrows" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-      {items.filter(item => dirs & item.bit).map(item => (
-        <text
-          key={item.bit}
-          x={item.x}
-          y={item.y}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill={arrowColor}
-          stroke={shadowColor}
-          strokeWidth={3.5}
-          paintOrder="stroke fill"
-          fontSize={item.fontSize}
-          fontWeight={700}
-        >
-          {item.label}
-        </text>
-      ))}
+      {arrowDefs.filter(def => dirs & def.bit).map(def => {
+        const { startX, startY, baseX, baseY, tipX, tipY, leftX, leftY, rightX, rightY } = makeArrow(def);
+        const headPoints = `${tipX},${tipY} ${leftX},${leftY} ${rightX},${rightY}`;
+        return (
+          <g key={def.bit}>
+            <line
+              x1={startX}
+              y1={startY}
+              x2={baseX}
+              y2={baseY}
+              stroke={shadowColor}
+              strokeWidth={shadowStrokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.6}
+            />
+            <polygon points={headPoints} fill={shadowColor} opacity={0.6} />
+            <line
+              x1={startX}
+              y1={startY}
+              x2={baseX}
+              y2={baseY}
+              stroke={arrowColor}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <polygon points={headPoints} fill={arrowColor} />
+          </g>
+        );
+      })}
     </svg>
   );
 }
