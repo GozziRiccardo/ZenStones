@@ -38,6 +38,8 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,
 .square.half-black{background:rgba(148,163,184,0.25)}
 .square.active-half{box-shadow:inset 0 0 0 2px rgba(244,63,94,0.18)}
 .square.inactive-half{opacity:0.9}
+.square.blocked-half{background:var(--slate-900) !important;color:var(--white)}
+.square.blocked-half .label{color:rgba(255,255,255,0.7)}
 .square.selected{outline:2px solid var(--rose-500);outline-offset:-2px}
 .square .label{position:absolute;left:6px;bottom:4px;font-size:10px;color:rgba(0,0,0,0.45)}
 .square.reach::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:rgba(244,63,94,0.8);box-shadow:0 0 0 4px rgba(244,63,94,0.25)}
