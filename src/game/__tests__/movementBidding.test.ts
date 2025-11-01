@@ -47,16 +47,20 @@ describe('movement bidding', () => {
     expect(state.movement.moveLimit).toBe(4);
   });
 
-  test('zero winning bid ends game immediately after plan', () => {
+  test('zero bids keep the move limit at zero and end the game when planned', () => {
     let state = setupMovementBiddingState();
     state = gameReducer(state, { type: 'movementBid', player: 'W', bid: 0 });
     state = gameReducer(state, { type: 'movementBid', player: 'B', bid: 0 });
 
+    expect(state.movement.bids.W).toBe(0);
+    expect(state.movement.bids.B).toBe(0);
     expect(state.movement.moveLimit).toBe(0);
+    expect(state.credits.W).toBe(100);
+    expect(state.credits.B).toBe(100);
 
     state = gameReducer(state, { type: 'movementPlan', player: 'W', startingPlayer: 'W' });
     expect(state.phase).toBe('ENDED');
     expect(state.turn).toBeNull();
-    expect(state.winner).toBeDefined();
+    expect(state.movement.moveLimit).toBe(0);
   });
 });

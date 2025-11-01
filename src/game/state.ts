@@ -42,7 +42,7 @@ export function createInitialState(): GameState {
       moveCount: 0,
     },
     placementCounts: { W: 0, B: 0 },
-    unlockedLabels: { W: {}, B: {} },
+    blockedLabels: { W: {}, B: {} },
   };
   recalcScores(base);
   return base;
@@ -56,8 +56,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
     state = { ...state, placementCounts: counts };
   }
-  if (!state.unlockedLabels) {
-    state = { ...state, unlockedLabels: { W: {}, B: {} } };
+  if (!state.blockedLabels) {
+    state = { ...state, blockedLabels: { W: {}, B: {} } };
   }
   switch (action.type) {
     case 'reset':
@@ -148,13 +148,13 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
   credits[state.turn] -= cost;
   const nextTurn = state.turn === 'W' ? 'B' : 'W';
   const placementCounts = { ...state.placementCounts, [state.turn]: state.placementCounts[state.turn] + 1 };
-  const unlockedLabels = {
-    W: { ...state.unlockedLabels.W },
-    B: { ...state.unlockedLabels.B },
+  const blockedLabels = {
+    W: { ...state.blockedLabels.W },
+    B: { ...state.blockedLabels.B },
   };
   if (cost > 0) {
-    unlockedLabels[nextTurn] = {
-      ...unlockedLabels[nextTurn],
+    blockedLabels[nextTurn] = {
+      ...blockedLabels[nextTurn],
       [cost]: true,
     };
   }
@@ -168,7 +168,7 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
     lastPlacementId: id,
     passesInARow: 0,
     placementCounts,
-    unlockedLabels,
+    blockedLabels,
   };
   recalcScores(next);
   return next;
@@ -246,7 +246,8 @@ function handleAssignStats(state: GameState, player: Player, assignments: Record
 function handleMovementBid(state: GameState, player: Player, bid: number): GameState {
   if (state.phase !== 'MOVEMENT_BIDDING') return state;
   if (state.movement.bids[player] !== undefined) return state;
-  const value = clamp(bid, 0, state.credits[player]);
+  const max = state.credits[player];
+  const value = clamp(bid, 0, max);
   const bids = { ...state.movement.bids, [player]: value };
   const next: GameState = {
     ...state,

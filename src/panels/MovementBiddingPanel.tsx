@@ -11,8 +11,10 @@ export function MovementBiddingPanel({
   submitPlan: (player: Player, startingPlayer: Player) => void;
 }) {
   const bids = state.movement.bids;
-  const [wBid, setWBid] = React.useState<number>(bids.W ?? 0);
-  const [bBid, setBBid] = React.useState<number>(bids.B ?? 0);
+  const defaultWhite = 0;
+  const defaultBlack = 0;
+  const [wBid, setWBid] = React.useState<number>(bids.W ?? defaultWhite);
+  const [bBid, setBBid] = React.useState<number>(bids.B ?? defaultBlack);
   React.useEffect(() => {
     if (bids.W !== undefined) setWBid(bids.W);
   }, [bids.W]);
@@ -55,7 +57,7 @@ export function MovementBiddingPanel({
   return (
     <div className="panel card" style={{ width: '100%' }}>
       <div>
-        <b>Movement bidding</b> — enter secret bids (integer ≤ credits), then lock. Both clocks tick until reveal.
+        <b>Movement bidding</b> — enter secret bids (integer ≥ 0 and ≤ credits), then lock. Both clocks tick until reveal.
       </div>
       <div className="row gap" style={{ alignItems: 'flex-end' }}>
         <BidBlock

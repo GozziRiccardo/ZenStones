@@ -39,6 +39,11 @@ export function Board({ state, onSquareClick, highlights = [], selectedId }: Boa
           if (state.phase === 'PLACEMENT') {
             const active = state.turn ? squareCostForPlayer(state, state.turn, r, c) > 0 : false;
             sqClasses.push(active ? 'active-half' : 'inactive-half');
+            const owner = r < mid ? 'B' : 'W';
+            const ownerBlocked = state.blockedLabels?.[owner] ?? {};
+            if (label && ownerBlocked[label]) {
+              sqClasses.push('blocked-half');
+            }
           }
           if (selectedId && id === selectedId) {
             sqClasses.push('selected');

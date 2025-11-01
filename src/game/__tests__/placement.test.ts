@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { createInitialState, gameReducer } from '../state';
 import { squareCostForPlayer } from '../utils';
 
-describe('placement unlocking', () => {
-  test('unlocking mirrored square for opponent', () => {
+describe('placement blocking', () => {
+  test('blocking mirrored square for opponent', () => {
     const state = createInitialState();
     state.phase = 'PLACEMENT';
     state.turn = 'W';
@@ -15,11 +15,11 @@ describe('placement unlocking', () => {
     state.labels.whiteHalf[9][0] = 5;
     state.labels.blackHalf[0][0] = 5;
 
-    expect(squareCostForPlayer(state, 'B', 9, 0)).toBe(0);
+    expect(squareCostForPlayer(state, 'B', 0, 0)).toBe(5);
 
     const next = gameReducer(state, { type: 'placementSquare', r: 9, c: 0 });
     expect(next.board[9][0]).not.toBeNull();
-    expect(next.unlockedLabels.B[5]).toBe(true);
-    expect(squareCostForPlayer(next, 'B', 9, 0)).toBe(5);
+    expect(next.blockedLabels.B[5]).toBe(true);
+    expect(squareCostForPlayer(next, 'B', 0, 0)).toBe(0);
   });
 });

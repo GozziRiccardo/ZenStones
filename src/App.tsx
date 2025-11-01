@@ -29,6 +29,9 @@ function loadPersistedState(): GameState | null {
       }
       parsed.placementCounts = counts;
     }
+    if (!parsed.blockedLabels) {
+      parsed.blockedLabels = { W: {}, B: {} };
+    }
     return parsed;
   } catch (err) {
     console.warn('Failed to load saved game state:', err);
