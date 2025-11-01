@@ -8,9 +8,10 @@ type BoardProps = {
   onSquareClick: (r:number,c:number)=>void;
   highlights?: {r:number;c:number}[];
   selectedId?: string | null;
+  blockedPreview?: { r: number; c: number } | null;
 };
 
-export function Board({ state, onSquareClick, highlights = [], selectedId }: BoardProps){
+export function Board({ state, onSquareClick, highlights = [], selectedId, blockedPreview }: BoardProps){
   const rows = state.board.length;
   const cols = state.board[0].length;
   const isHighlight = (r:number,c:number) => highlights.some(p=>p.r===r && p.c===c);
@@ -39,11 +40,10 @@ export function Board({ state, onSquareClick, highlights = [], selectedId }: Boa
           if (state.phase === 'PLACEMENT') {
             const active = state.turn ? squareCostForPlayer(state, state.turn, r, c) > 0 : false;
             sqClasses.push(active ? 'active-half' : 'inactive-half');
-            const owner = r < mid ? 'B' : 'W';
-            const ownerBlocked = state.blockedLabels?.[owner] ?? {};
-            if (label && ownerBlocked[label]) {
-              sqClasses.push('blocked-half');
-            }
+          }
+          const isBlockedPreview = blockedPreview && blockedPreview.r === r && blockedPreview.c === c;
+          if (isBlockedPreview) {
+            sqClasses.push('blocked-feedback');
           }
           if (selectedId && id === selectedId) {
             sqClasses.push('selected');
