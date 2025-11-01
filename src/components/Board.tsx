@@ -66,9 +66,9 @@ export function Board({ state, onSquareClick, highlights = [], selectedId }: Boa
             >
               {stone && (
                 <div
-                  className={`stone-wrapper ${stone.owner === 'B' ? 'stone-black' : 'stone-white'}${isNew ? ' drop' : ''}${stone.persistent ? ` persistent ${stone.owner === 'W' ? 'persistent-white' : 'persistent-black'}` : ''}`}
+                  className={`stone-wrapper ${stone.owner === 'B' ? 'stone-black' : 'stone-white'}${isNew ? ' drop' : ''}`}
                 >
-                  <StoneIcon d={(stone.d||1) as any} owner={stone.owner} />
+                  <StoneIcon d={(stone.d||1) as any} owner={stone.owner} persistent={stone.persistent} />
                   {stone.dirs ? <DirArrows dirs={stone.dirs} owner={stone.owner} /> : null}
                 </div>
               )}
