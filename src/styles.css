@@ -46,14 +46,12 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,
 .square[data-cost]:hover::before{content:attr(data-cost);position:absolute;top:6px;right:6px;background:rgba(15,23,42,0.85);color:white;font-size:10px;padding:2px 4px;border-radius:4px;pointer-events:none}
 .square[data-cost]:hover{transform:translateY(-1px)}
 
-.stone-wrapper{position:relative;display:flex;align-items:center;justify-content:center;color:var(--slate-700)}
-.stone-wrapper svg{width:96%;height:96%;}
+.stone-wrapper{position:relative;display:flex;align-items:center;justify-content:center;color:var(--slate-700);width:88%;height:88%;}
+.stone-wrapper .stone-icon{width:100%;height:100%;}
+.stone-wrapper .stone-arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
 .stone-wrapper.stone-white{color:var(--slate-700);}
 .stone-wrapper.stone-black{color:var(--rose-50);}
 .stone-wrapper.drop{animation:stone-drop 0.35s ease-out}
-.stone-wrapper.persistent{border-radius:50%;box-shadow:0 0 0 3px currentColor}
-.stone-wrapper.persistent-white{color:var(--slate-700);box-shadow:0 0 0 3px #ef4444}
-.stone-wrapper.persistent-black{color:var(--rose-50);box-shadow:0 0 0 3px #facc15}
 
 @keyframes stone-drop{
   0%{transform:translateY(-14px) scale(0.85);opacity:0}
@@ -98,7 +96,7 @@ hr{border:none;border-top:1px solid #f1f5f9;margin:12px 0}
 .dir-center{width:16px;height:16px}
 .persistence-toggle{display:flex;align-items:center;margin-top:4px}
 .dir-check{font-size:12px;color:#475569;white-space:nowrap}
-.dir-check input{margin-right:2px}
+.dir-check input{margin-right:2px;accent-color:var(--slate-600)}
 .small-btn{font-size:12px;padding:4px 8px}
 .warning{margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(254,202,202,0.6);color:#b91c1c;font-size:13px}
 

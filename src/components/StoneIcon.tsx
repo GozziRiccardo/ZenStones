@@ -4,10 +4,13 @@ import { DIR } from '../game/types';
 
 type Dist = 1|2|3|4|5;
 
-type StoneIconProps = { d: Dist; color?: string; owner?: Player };
+type StoneIconProps = { d: Dist; color?: string; owner?: Player; persistent?: boolean };
 
-export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
-  const size = 42, cx = size / 2, cy = size / 2, r = 14;
+export function StoneIcon({ d, color='currentColor', owner, persistent }: StoneIconProps) {
+  const size = 100;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.42;
   const viewBox = `0 0 ${size} ${size}`;
 
   const fill = owner === 'B'
@@ -20,7 +23,13 @@ export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
       ? 'var(--rose-50)'
       : 'var(--slate-700)'
     : color;
-  const strokeWidth = 3;
+  const highlightStroke = persistent
+    ? owner === 'W'
+      ? '#ef4444'
+      : '#facc15'
+    : null;
+  const strokeWidth = 8;
+  const highlightWidth = strokeWidth + 4;
 
   const poly = (n: number, rr = r) =>
     Array.from({ length: n }, (_, i) => {
@@ -30,76 +39,87 @@ export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
       return `${x},${y}`;
     }).join(' ');
 
-  if (d === 1) {
-    return (
-      <svg width={size} height={size} viewBox={viewBox}>
-        <circle cx={cx} cy={cy} r={r} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
-      </svg>
-    );
-  }
-  if (d === 2) {
-    return (
-      <svg width={size} height={size} viewBox={viewBox}>
-        {(() => {
-          const doubleR = r - 3;
-          const offset = doubleR;
-          return (
-            <>
-              <circle cx={cx - offset} cy={cy} r={doubleR} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
-              <circle cx={cx + offset} cy={cy} r={doubleR} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
-            </>
-          );
-        })()}
-      </svg>
-    );
-  }
-  if (d === 3) {
-    return (
-      <svg width={size} height={size} viewBox={viewBox}>
-        <polygon points={poly(3)} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
-      </svg>
-    );
-  }
-  if (d === 4) {
-    return (
-      <svg width={size} height={size} viewBox={viewBox}>
-        <rect x={cx - r} y={cy - r} width={2*r} height={2*r} rx={3} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
-      </svg>
-    );
-  }
-  return (
-    <svg width={size} height={size} viewBox={viewBox}>
-      <polygon points={poly(5)} fill={fill} stroke={stroke} strokeWidth={strokeWidth}/>
+  const renderHighlight = (node: React.ReactElement) => (
+    <svg className="stone-icon" width={size} height={size} viewBox={viewBox}>
+      {highlightStroke ? React.cloneElement(node, {
+        fill: 'none',
+        stroke: highlightStroke,
+        strokeWidth: highlightWidth,
+        strokeLinejoin: 'round',
+        strokeLinecap: 'round',
+      }) : null}
+      {React.cloneElement(node, {
+        fill,
+        stroke,
+        strokeWidth,
+        strokeLinejoin: 'round',
+        strokeLinecap: 'round',
+      })}
     </svg>
   );
+
+  if (d === 1) {
+    const circle = <circle cx={cx} cy={cy} r={r} />;
+    return renderHighlight(circle);
+  }
+  if (d === 2) {
+    const doubleR = r * 0.5;
+    const offset = doubleR;
+    const group = (
+      <g>
+        <circle cx={cx - offset} cy={cy} r={doubleR} />
+        <circle cx={cx + offset} cy={cy} r={doubleR} />
+      </g>
+    );
+    return renderHighlight(group);
+  }
+  if (d === 3) {
+    const triangle = <polygon points={poly(3)} />;
+    return renderHighlight(triangle);
+  }
+  if (d === 4) {
+    const rectSize = r * 1.6;
+    const square = <rect x={cx - rectSize/2} y={cy - rectSize/2} width={rectSize} height={rectSize} rx={8} />;
+    return renderHighlight(square);
+  }
+  const pentagon = <polygon points={poly(5)} />;
+  return renderHighlight(pentagon);
 }
 
 export function DirArrows({ dirs, color='#facc15', owner }: { dirs:number; color?:string; owner?: Player }){
   const arrowColor = owner === 'W' ? '#ef4444' : color ?? '#facc15';
-  const base: React.CSSProperties = {
-    position:'absolute',
-    fontSize:16,
-    fontWeight:700,
-    color: arrowColor,
-    textShadow: '0 0 5px rgba(15,23,42,0.85)'
-  };
-  const items: { bit: number; label: string; style: React.CSSProperties }[] = [
-    { bit: DIR.R, label: '→', style: { right:4, top:'50%', transform:'translateY(-50%)' } },
-    { bit: DIR.L, label: '←', style: { left:4, top:'50%', transform:'translateY(-50%)' } },
-    { bit: DIR.U, label: '↑', style: { top:2, left:'50%', transform:'translateX(-50%)' } },
-    { bit: DIR.D, label: '↓', style: { bottom:2, left:'50%', transform:'translateX(-50%)' } },
-    { bit: DIR.UR, label: '↗', style: { top:4, right:6 } },
-    { bit: DIR.UL, label: '↖', style: { top:4, left:6 } },
-    { bit: DIR.DR, label: '↘', style: { bottom:4, right:6 } },
-    { bit: DIR.DL, label: '↙', style: { bottom:4, left:6 } },
+  const shadowColor = 'rgba(15,23,42,0.78)';
+  const baseFontSize = 28;
+  const diagonalFontSize = 24;
+  const items: { bit: number; label: string; x: number; y: number; fontSize: number }[] = [
+    { bit: DIR.R, label: '→', x: 74, y: 50, fontSize: baseFontSize },
+    { bit: DIR.L, label: '←', x: 26, y: 50, fontSize: baseFontSize },
+    { bit: DIR.U, label: '↑', x: 50, y: 26, fontSize: baseFontSize },
+    { bit: DIR.D, label: '↓', x: 50, y: 74, fontSize: baseFontSize },
+    { bit: DIR.UR, label: '↗', x: 72, y: 30, fontSize: diagonalFontSize },
+    { bit: DIR.UL, label: '↖', x: 28, y: 30, fontSize: diagonalFontSize },
+    { bit: DIR.DR, label: '↘', x: 72, y: 70, fontSize: diagonalFontSize },
+    { bit: DIR.DL, label: '↙', x: 28, y: 70, fontSize: diagonalFontSize },
   ];
   return (
-    <>
-      {items.map(item =>
-        dirs & item.bit ? (
-          <span key={item.bit} style={{ ...base, ...item.style }}>{item.label}</span>
-        ) : null
-      )}
-    </>
+    <svg className="stone-arrows" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+      {items.filter(item => dirs & item.bit).map(item => (
+        <text
+          key={item.bit}
+          x={item.x}
+          y={item.y}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill={arrowColor}
+          stroke={shadowColor}
+          strokeWidth={3.5}
+          paintOrder="stroke fill"
+          fontSize={item.fontSize}
+          fontWeight={700}
+        >
+          {item.label}
+        </text>
+      ))}
+    </svg>
   );
 }
