@@ -412,10 +412,24 @@ export function hasAnyLegalMove(state: GameState, player: Player): boolean {
 
 export function getTickingMode(state: GameState): 'none' | 'both' | Player {
   switch (state.phase) {
-    case 'BIDDING':
-      return state.bids.revealed ? 'none' : 'both';
-    case 'MOVEMENT_BIDDING':
-      return state.movement.bids.revealed ? 'none' : 'both';
+    case 'BIDDING': {
+      if (state.bids.revealed) return 'none';
+      const wLocked = typeof state.bids.W === 'number';
+      const bLocked = typeof state.bids.B === 'number';
+      if (wLocked && bLocked) return 'none';
+      if (wLocked) return 'B';
+      if (bLocked) return 'W';
+      return 'both';
+    }
+    case 'MOVEMENT_BIDDING': {
+      if (state.movement.bids.revealed) return 'none';
+      const wLocked = typeof state.movement.bids.W === 'number';
+      const bLocked = typeof state.movement.bids.B === 'number';
+      if (wLocked && bLocked) return 'none';
+      if (wLocked) return 'B';
+      if (bLocked) return 'W';
+      return 'both';
+    }
     case 'PLACEMENT':
       return state.turn ?? 'none';
     case 'ASSIGN_STATS_W':
