@@ -54,10 +54,12 @@ export default function App() {
   );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
+  const [blockedPreview, setBlockedPreview] = React.useState<{ r: number; c: number } | null>(null);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
   const toastId = React.useRef(0);
   const lastTick = React.useRef<number>(Date.now());
   const toastTimers = React.useRef<Record<number, number>>({});
+  const blockedTimer = React.useRef<number | null>(null);
 
   const pushToast = React.useCallback((message: string) => {
     toastId.current += 1;
@@ -73,8 +75,26 @@ export default function App() {
   React.useEffect(() => {
     return () => {
       Object.values(toastTimers.current).forEach((timer) => window.clearTimeout(timer));
+      if (blockedTimer.current !== null) {
+        window.clearTimeout(blockedTimer.current);
+        blockedTimer.current = null;
+      }
     };
   }, []);
+
+  const clearBlockedPreview = React.useCallback(() => {
+    setBlockedPreview(null);
+    if (blockedTimer.current !== null) {
+      window.clearTimeout(blockedTimer.current);
+      blockedTimer.current = null;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (state.phase !== 'PLACEMENT') {
+      clearBlockedPreview();
+    }
+  }, [state.phase, clearBlockedPreview]);
 
   React.useEffect(() => {
     lastTick.current = Date.now();
@@ -180,12 +200,24 @@ export default function App() {
       return;
     }
     const cost = squareCostForPlayer(state, state.turn, r, c);
-    if (cost <= 0) return;
+    if (cost <= 0) {
+      setBlockedPreview({ r, c });
+      if (blockedTimer.current !== null) {
+        window.clearTimeout(blockedTimer.current);
+      }
+      blockedTimer.current = window.setTimeout(() => {
+        setBlockedPreview(null);
+        blockedTimer.current = null;
+      }, 650);
+      pushToast('That square is not available.');
+      return;
+    }
     if (state.credits[state.turn] < cost) {
       pushToast('Not enough credits for that square.');
       return;
     }
     dispatch({ type: 'placementSquare', r, c });
+    clearBlockedPreview();
   };
 
   const handleMovementSquare = (r: number, c: number) => {
@@ -306,6 +338,7 @@ export default function App() {
           onSquareClick={onSquareClick}
           highlights={selectedMoves}
           selectedId={selectedId}
+          blockedPreview={blockedPreview}
         />
         <div style={{ flex: 1, minWidth: 320 }}>
           {state.phase === 'BIDDING' && (

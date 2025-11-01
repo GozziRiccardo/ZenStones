@@ -113,7 +113,7 @@ export function DirArrows({ d, dirs, color='#facc15', owner }: { d: Dist; dirs:n
   const shadowColor = 'rgba(15,23,42,0.78)';
   const cx = STONE_CENTER;
   const cy = STONE_CENTER;
-  const startOffset = 8;
+  const baseStartOffset = 8;
   const baseHeadLength = 10;
   const minHeadLength = 6;
   const headWidthBase = 12;
@@ -122,6 +122,8 @@ export function DirArrows({ d, dirs, color='#facc15', owner }: { d: Dist; dirs:n
   const strokeWidth = 6;
   const shadowStrokeWidth = strokeWidth + 3;
   const outline = getStoneOutline(d);
+  const innerRadius = d === 2 ? STONE_OUTER_RADIUS * 0.28 : 0;
+  const startOffset = Math.max(baseStartOffset, innerRadius + 4);
   const arrowDefs: { bit: number; vx: number; vy: number }[] = [
     { bit: DIR.R, vx: 1, vy: 0 },
     { bit: DIR.L, vx: -1, vy: 0 },
