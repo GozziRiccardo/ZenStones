@@ -39,42 +39,52 @@ export function StoneIcon({ d, color='currentColor', owner, persistent }: StoneI
       return `${x},${y}`;
     }).join(' ');
 
-  const renderHighlight = (node: React.ReactElement) => (
-    <svg className="stone-icon" width={size} height={size} viewBox={viewBox}>
-      {highlightStroke ? React.cloneElement(node, {
-        fill: 'none',
-        stroke: highlightStroke,
-        strokeWidth: highlightWidth,
-        strokeLinejoin: 'round',
-        strokeLinecap: 'round',
-      }) : null}
-      {React.cloneElement(node, {
-        fill,
-        stroke,
-        strokeWidth,
-        strokeLinejoin: 'round',
-        strokeLinecap: 'round',
-      })}
-    </svg>
-  );
+const renderHighlight = (node: React.ReactElement, overlay?: React.ReactNode) => (
+  <svg className="stone-icon" width={size} height={size} viewBox={viewBox}>
+    {highlightStroke ? React.cloneElement(node, {
+      fill: 'none',
+      stroke: highlightStroke,
+      strokeWidth: highlightWidth,
+      strokeLinejoin: 'round',
+      strokeLinecap: 'round',
+    }) : null}
+    {React.cloneElement(node, {
+      fill,
+      stroke,
+      strokeWidth,
+      strokeLinejoin: 'round',
+      strokeLinecap: 'round',
+    })}
+    {overlay}
+  </svg>
+);
 
   if (d === 1) {
     const circle = <circle cx={cx} cy={cy} r={r} />;
     return renderHighlight(circle);
   }
   if (d === 2) {
-    const doubleR = r * 0.5;
-    const offset = doubleR;
-    const group = (
-      <g>
-        <circle cx={cx - offset} cy={cy} r={doubleR} />
-        <circle cx={cx + offset} cy={cy} r={doubleR} />
-      </g>
+    const circle = <circle cx={cx} cy={cy} r={r} />;
+    const innerRadius = r * 0.28;
+    const innerFill = owner === 'B'
+      ? (persistent ? '#facc15' : 'var(--white)')
+      : owner === 'W'
+        ? (persistent ? '#ef4444' : 'var(--slate-900)')
+        : color;
+    const overlay = (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={innerRadius}
+        fill={innerFill}
+        stroke={owner ? 'rgba(15,23,42,0.08)' : 'none'}
+        strokeWidth={owner ? 2 : 0}
+      />
     );
-    return renderHighlight(group);
+    return renderHighlight(circle, overlay);
   }
   if (d === 3) {
-    const triangle = <polygon points={poly(3)} />;
+    const triangle = <polygon points={poly(3, r * 1.045)} />;
     return renderHighlight(triangle);
   }
   if (d === 4) {
