@@ -12,7 +12,7 @@ export type GameAction =
   | { type: 'placementPass' }
   | { type: 'assignStats'; player: Player; assignments: Record<string, Assignment> }
   | { type: 'movementBid'; player: Player; bid: number }
-  | { type: 'movementPlan'; player: Player; moveLimit: number; startingPlayer: Player }
+  | { type: 'movementPlan'; player: Player; startingPlayer: Player }
   | { type: 'movementMove'; stoneId: string; r: number; c: number }
   | { type: 'movementPass' };
 
@@ -42,6 +42,7 @@ export function createInitialState(): GameState {
       moveCount: 0,
     },
     placementCounts: { W: 0, B: 0 },
+    unlockedLabels: { W: {}, B: {} },
   };
   recalcScores(base);
   return base;
@@ -54,6 +55,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       counts[stone.owner] += 1;
     }
     state = { ...state, placementCounts: counts };
+  }
+  if (!state.unlockedLabels) {
+    state = { ...state, unlockedLabels: { W: {}, B: {} } };
   }
   switch (action.type) {
     case 'reset':
@@ -73,7 +77,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'movementBid':
       return handleMovementBid(state, action.player, action.bid);
     case 'movementPlan':
-      return handleMovementPlan(state, action.player, action.moveLimit, action.startingPlayer);
+      return handleMovementPlan(state, action.player, action.startingPlayer);
     case 'movementMove':
       return handleMovementMove(state, action.stoneId, action.r, action.c);
     case 'movementPass':
@@ -144,6 +148,16 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
   credits[state.turn] -= cost;
   const nextTurn = state.turn === 'W' ? 'B' : 'W';
   const placementCounts = { ...state.placementCounts, [state.turn]: state.placementCounts[state.turn] + 1 };
+  const unlockedLabels = {
+    W: { ...state.unlockedLabels.W },
+    B: { ...state.unlockedLabels.B },
+  };
+  if (cost > 0) {
+    unlockedLabels[nextTurn] = {
+      ...unlockedLabels[nextTurn],
+      [cost]: true,
+    };
+  }
   const next: GameState = {
     ...state,
     stones,
@@ -154,6 +168,7 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
     lastPlacementId: id,
     passesInARow: 0,
     placementCounts,
+    unlockedLabels,
   };
   recalcScores(next);
   return next;
@@ -244,13 +259,17 @@ function handleMovementBid(state: GameState, player: Player, bid: number): GameS
   const bBid = bids.B;
   if (typeof wBid === 'number' && typeof bBid === 'number' && !bids.revealed) {
     const winner = wBid === bBid ? 'W' : wBid > bBid ? 'W' : 'B';
+    const winningBid = winner === 'W' ? wBid : bBid;
     const credits = { ...state.credits };
-    credits[winner] = Math.max(0, credits[winner] - (winner === 'W' ? wBid : bBid));
+    credits[winner] = Math.max(0, credits[winner] - winningBid);
     const updatedBids = { ...bids, revealed: true, winner };
     const movement = {
       ...state.movement,
       bids: updatedBids,
+      moveLimit: winningBid,
+      moveCount: 0,
       decider: winner,
+      startingPlayer: undefined,
     };
     const result: GameState = {
       ...state,
@@ -266,28 +285,38 @@ function handleMovementBid(state: GameState, player: Player, bid: number): GameS
 function handleMovementPlan(
   state: GameState,
   player: Player,
-  moveLimit: number,
   startingPlayer: Player,
 ): GameState {
   if (state.phase !== 'MOVEMENT_BIDDING') return state;
   if (!state.movement.bids.revealed) return state;
   if (state.movement.bids.winner !== player) return state;
-  const limit = Math.max(1, Math.floor(moveLimit));
+  const limit = state.movement.moveLimit ?? 0;
   const movement = {
     ...state.movement,
-    moveLimit: limit,
     moveCount: 0,
     startingPlayer,
     decider: player,
   };
-  const next: GameState = {
+  const base: GameState = {
     ...state,
     movement,
-    phase: 'MOVEMENT',
-    turn: startingPlayer,
     passesInARow: 0,
   };
-  return next;
+  if (limit <= 0) {
+    const ended: GameState = {
+      ...base,
+      phase: 'ENDED',
+      turn: null,
+    };
+    recalcScores(ended);
+    ended.winner = determineScoreWinner(ended);
+    return ended;
+  }
+  return {
+    ...base,
+    phase: 'MOVEMENT',
+    turn: startingPlayer,
+  };
 }
 
 function handleMovementMove(state: GameState, stoneId: string, r: number, c: number): GameState {

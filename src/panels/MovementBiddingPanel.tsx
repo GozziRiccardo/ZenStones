@@ -8,7 +8,7 @@ export function MovementBiddingPanel({
 }: {
   state: GameState;
   lockBid: (player: Player, bid: number) => void;
-  submitPlan: (player: Player, moveLimit: number, startingPlayer: Player) => void;
+  submitPlan: (player: Player, startingPlayer: Player) => void;
 }) {
   const bids = state.movement.bids;
   const [wBid, setWBid] = React.useState<number>(bids.W ?? 0);
@@ -26,12 +26,7 @@ export function MovementBiddingPanel({
   const blackLocked = typeof bids.B === 'number';
 
   const winner = bids.winner;
-  const [limit, setLimit] = React.useState<number>(state.movement.moveLimit ?? 10);
-  React.useEffect(() => {
-    if (state.movement.moveLimit !== undefined) {
-      setLimit(state.movement.moveLimit);
-    }
-  }, [state.movement.moveLimit]);
+  const limit = state.movement.moveLimit ?? 0;
 
   const [starter, setStarter] = React.useState<Player>(winner ?? 'W');
   React.useEffect(() => {
@@ -42,7 +37,7 @@ export function MovementBiddingPanel({
 
   const onPlan = () => {
     if (!winner) return;
-    submitPlan(winner, limit, starter);
+    submitPlan(winner, starter);
   };
 
   const summaryRows = bids.revealed ? (
@@ -52,6 +47,7 @@ export function MovementBiddingPanel({
         <span>White {bids.W}</span>
         <span>Black {bids.B}</span>
         <span>Chooser: <b>{winner === 'B' ? 'Black' : 'White'}</b></span>
+        <span>Limit: <b>{limit}</b></span>
       </div>
     </div>
   ) : null;
@@ -88,21 +84,11 @@ export function MovementBiddingPanel({
       {bids.revealed && winner ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ marginBottom: 8 }}>
-            <b>{winner === 'B' ? 'Black' : 'White'}</b> pays their bid and chooses the plan.
+            <b>{winner === 'B' ? 'Black' : 'White'}</b> pays their bid and chooses who starts.
           </div>
-          <label className="small" style={{ display: 'block', marginBottom: 6 }}>
-            Move limit
-            <input
-              className="input number"
-              type="number"
-              min={1}
-              value={limit}
-              onChange={(e) => {
-                const parsed = Number.parseInt(e.target.value || '1', 10);
-                setLimit(Number.isNaN(parsed) ? 1 : Math.max(1, parsed));
-              }}
-            />
-          </label>
+          <div className="small" style={{ marginBottom: 8 }}>
+            Move limit: <b>{limit}</b> — exactly the winning bid.
+          </div>
           <div className="row gap" style={{ marginBottom: 8 }}>
             <button
               className={`btn outline${starter === 'W' ? ' active' : ''}`}

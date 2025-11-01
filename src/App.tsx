@@ -131,10 +131,12 @@ export default function App() {
   React.useEffect(() => {
     if (!prevMovementReveal.current && state.movement.bids.revealed) {
       const chooser = state.movement.bids.winner === 'B' ? 'Black' : 'White';
-      pushToast(`Movement bids revealed. ${chooser} will set the plan.`);
+      const limit = state.movement.moveLimit ?? 0;
+      const summary = `${limit} move${limit === 1 ? '' : 's'}`;
+      pushToast(`Movement bids revealed. ${chooser} will choose who starts — limit: ${summary}.`);
     }
     prevMovementReveal.current = state.movement.bids.revealed;
-  }, [state.movement.bids.revealed, state.movement.bids.winner, pushToast]);
+  }, [state.movement.bids.revealed, state.movement.bids.winner, pushToast, state.movement.moveLimit]);
 
   React.useEffect(() => {
     if (!selectedId) return;
@@ -244,8 +246,8 @@ export default function App() {
     dispatch({ type: 'movementBid', player, bid });
   };
 
-  const handleMovementPlan = (player: Player, moveLimit: number, startingPlayer: Player) => {
-    dispatch({ type: 'movementPlan', player, moveLimit, startingPlayer });
+  const handleMovementPlan = (player: Player, startingPlayer: Player) => {
+    dispatch({ type: 'movementPlan', player, startingPlayer });
   };
 
   const handleAssignFocus = (stoneId: string | null) => {
