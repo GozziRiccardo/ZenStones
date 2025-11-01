@@ -1,16 +1,22 @@
 import * as React from 'react';
-import type { Player } from '../game/types';
+import type { Player, Dist } from '../game/types';
 import { DIR } from '../game/types';
-
-type Dist = 1|2|3|4|5;
+import {
+  STONE_CENTER,
+  STONE_HIGHLIGHT_WIDTH,
+  STONE_OUTER_RADIUS,
+  STONE_SIZE,
+  STONE_STROKE_WIDTH,
+  getRayIntersectionDistance,
+  getStoneOutline,
+} from './stoneGeometry';
 
 type StoneIconProps = { d: Dist; color?: string; owner?: Player; persistent?: boolean };
 
 export function StoneIcon({ d, color='currentColor', owner, persistent }: StoneIconProps) {
-  const size = 100;
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size * 0.42;
+  const size = STONE_SIZE;
+  const cx = STONE_CENTER;
+  const cy = STONE_CENTER;
   const viewBox = `0 0 ${size} ${size}`;
 
   const fill = owner === 'B'
@@ -28,16 +34,12 @@ export function StoneIcon({ d, color='currentColor', owner, persistent }: StoneI
       ? '#ef4444'
       : '#facc15'
     : null;
-  const strokeWidth = 8;
-  const highlightWidth = strokeWidth + 4;
+  const strokeWidth = STONE_STROKE_WIDTH;
+  const highlightWidth = STONE_HIGHLIGHT_WIDTH;
 
-  const poly = (n: number, rr = r) =>
-    Array.from({ length: n }, (_, i) => {
-      const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-      const x = cx + rr * Math.cos(a);
-      const y = cy + rr * Math.sin(a);
-      return `${x},${y}`;
-    }).join(' ');
+  const outline = getStoneOutline(d);
+
+  const polygonPoints = (points: [number, number][]) => points.map(([x, y]) => `${x},${y}`).join(' ');
 
 const renderHighlight = (node: React.ReactElement, overlay?: React.ReactNode) => (
   <svg className="stone-icon" width={size} height={size} viewBox={viewBox}>
@@ -60,12 +62,12 @@ const renderHighlight = (node: React.ReactElement, overlay?: React.ReactNode) =>
 );
 
   if (d === 1) {
-    const circle = <circle cx={cx} cy={cy} r={r} />;
+    const circle = <circle cx={cx} cy={cy} r={STONE_OUTER_RADIUS} />;
     return renderHighlight(circle);
   }
   if (d === 2) {
-    const circle = <circle cx={cx} cy={cy} r={r} />;
-    const innerRadius = r * 0.28;
+    const circle = <circle cx={cx} cy={cy} r={STONE_OUTER_RADIUS} />;
+    const innerRadius = STONE_OUTER_RADIUS * 0.28;
     const innerFill = owner === 'B'
       ? (persistent ? '#facc15' : 'var(--white)')
       : owner === 'W'
@@ -83,30 +85,43 @@ const renderHighlight = (node: React.ReactElement, overlay?: React.ReactNode) =>
     );
     return renderHighlight(circle, overlay);
   }
-  if (d === 3) {
-    const triangle = <polygon points={poly(3, r * 1.045)} />;
-    return renderHighlight(triangle);
-  }
-  if (d === 4) {
-    const rectSize = r * 1.6;
-    const square = <rect x={cx - rectSize/2} y={cy - rectSize/2} width={rectSize} height={rectSize} rx={8} />;
+  if (outline.type === 'rect') {
+    const width = outline.halfWidth * 2;
+    const height = outline.halfHeight * 2;
+    const square = (
+      <rect
+        x={cx - outline.halfWidth}
+        y={cy - outline.halfHeight}
+        width={width}
+        height={height}
+        rx={outline.cornerRadius}
+      />
+    );
     return renderHighlight(square);
   }
-  const pentagon = <polygon points={poly(5)} />;
-  return renderHighlight(pentagon);
+  if (outline.type === 'polygon') {
+    const polygon = <polygon points={polygonPoints(outline.points)} />;
+    return renderHighlight(polygon);
+  }
+
+  const circle = <circle cx={cx} cy={cy} r={STONE_OUTER_RADIUS} />;
+  return renderHighlight(circle);
 }
 
-export function DirArrows({ dirs, color='#facc15', owner }: { dirs:number; color?:string; owner?: Player }){
+export function DirArrows({ d, dirs, color='#facc15', owner }: { d: Dist; dirs:number; color?:string; owner?: Player }){
   const arrowColor = owner === 'W' ? '#ef4444' : color ?? '#facc15';
   const shadowColor = 'rgba(15,23,42,0.78)';
-  const cx = 50;
-  const cy = 50;
+  const cx = STONE_CENTER;
+  const cy = STONE_CENTER;
   const startOffset = 8;
-  const shaftLength = 22;
-  const headLength = 10;
-  const headWidth = 12;
+  const baseHeadLength = 10;
+  const minHeadLength = 6;
+  const headWidthBase = 12;
+  const headWidthMin = 6;
+  const arrowClearance = 0.5;
   const strokeWidth = 6;
   const shadowStrokeWidth = strokeWidth + 3;
+  const outline = getStoneOutline(d);
   const arrowDefs: { bit: number; vx: number; vy: number }[] = [
     { bit: DIR.R, vx: 1, vy: 0 },
     { bit: DIR.L, vx: -1, vy: 0 },
@@ -122,12 +137,19 @@ export function DirArrows({ dirs, color='#facc15', owner }: { dirs:number; color
     const mag = Math.hypot(vx, vy) || 1;
     const dirX = vx / mag;
     const dirY = vy / mag;
+    const maxDistance = getRayIntersectionDistance(outline, dirX, dirY);
+    const tipDistance = Math.max(startOffset, maxDistance - arrowClearance);
+    const available = Math.max(0, tipDistance - startOffset);
+    const targetHead = Math.min(baseHeadLength, Math.max(minHeadLength, available * 0.45));
+    const headLength = Math.min(available, targetHead);
+    const shaftLength = Math.max(0, available - headLength);
+    const headWidth = Math.min(headWidthBase, Math.max(headWidthMin, headLength * 1.2));
     const startX = cx + dirX * startOffset;
     const startY = cy + dirY * startOffset;
     const baseX = cx + dirX * (startOffset + shaftLength);
     const baseY = cy + dirY * (startOffset + shaftLength);
-    const tipX = cx + dirX * (startOffset + shaftLength + headLength);
-    const tipY = cy + dirY * (startOffset + shaftLength + headLength);
+    const tipX = cx + dirX * tipDistance;
+    const tipY = cy + dirY * tipDistance;
     const perpX = -dirY;
     const perpY = dirX;
     const leftX = baseX + perpX * (headWidth / 2);
