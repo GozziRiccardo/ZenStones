@@ -1,5 +1,6 @@
 import * as React from 'react';
 import type { Player } from '../game/types';
+import { DIR } from '../game/types';
 
 type Dist = 1|2|3|4|5;
 
@@ -75,19 +76,30 @@ export function StoneIcon({ d, color='currentColor', owner }: StoneIconProps) {
 
 export function DirArrows({ dirs, color='#facc15', owner }: { dirs:number; color?:string; owner?: Player }){
   const arrowColor = owner === 'W' ? '#ef4444' : color ?? '#facc15';
-  const style: React.CSSProperties = {
+  const base: React.CSSProperties = {
     position:'absolute',
     fontSize:16,
     fontWeight:700,
     color: arrowColor,
     textShadow: '0 0 5px rgba(15,23,42,0.85)'
   };
+  const items: { bit: number; label: string; style: React.CSSProperties }[] = [
+    { bit: DIR.R, label: '→', style: { right:4, top:'50%', transform:'translateY(-50%)' } },
+    { bit: DIR.L, label: '←', style: { left:4, top:'50%', transform:'translateY(-50%)' } },
+    { bit: DIR.U, label: '↑', style: { top:2, left:'50%', transform:'translateX(-50%)' } },
+    { bit: DIR.D, label: '↓', style: { bottom:2, left:'50%', transform:'translateX(-50%)' } },
+    { bit: DIR.UR, label: '↗', style: { top:4, right:6 } },
+    { bit: DIR.UL, label: '↖', style: { top:4, left:6 } },
+    { bit: DIR.DR, label: '↘', style: { bottom:4, right:6 } },
+    { bit: DIR.DL, label: '↙', style: { bottom:4, left:6 } },
+  ];
   return (
     <>
-      {(dirs & 1) ? <span style={{...style, right:4}}>→</span> : null}
-      {(dirs & 2) ? <span style={{...style, left:4}}>←</span> : null}
-      {(dirs & 4) ? <span style={{...style, top:2}}>↑</span> : null}
-      {(dirs & 8) ? <span style={{...style, bottom:2}}>↓</span> : null}
+      {items.map(item =>
+        dirs & item.bit ? (
+          <span key={item.bit} style={{ ...base, ...item.style }}>{item.label}</span>
+        ) : null
+      )}
     </>
   );
 }

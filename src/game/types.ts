@@ -8,8 +8,17 @@ export type Phase =
   | 'MOVEMENT'
   | 'ENDED';
 
-export type DirMask = number; // bits: 1=Right, 2=Left, 4=Up, 8=Down
-export const DIR = { R:1, L:2, U:4, D:8 } as const;
+export type DirMask = number; // bits: 1=Right, 2=Left, 4=Up, 8=Down, 16=UpRight, 32=UpLeft, 64=DownRight, 128=DownLeft
+export const DIR = {
+  R: 1,
+  L: 2,
+  U: 4,
+  D: 8,
+  UR: 16,
+  UL: 32,
+  DR: 64,
+  DL: 128,
+} as const;
 
 export type Dist = 1 | 2 | 3 | 4 | 5;
 
@@ -20,9 +29,10 @@ export type Stone = {
   c: number;
   d?: Dist;
   dirs?: DirMask;
+  persistent?: boolean;
 };
 
-export type Assignment = { d: Dist; dirs: DirMask };
+export type Assignment = { d: Dist; dirs: DirMask; persistent?: boolean };
 
 export type Clocks = { W: number; B: number };
 export type Scores = { W: number; B: number };
