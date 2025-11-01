@@ -212,13 +212,24 @@ function handleAssignStats(state: GameState, player: Player, assignments: Record
   for (const id of Object.keys(assignments)) {
     const stone = stones[id];
     if (!stone || stone.owner !== player) continue;
-    stones[id] = { ...stone, ...assignments[id] };
+    const update = assignments[id];
+    stones[id] = {
+      ...stone,
+      d: update.d,
+      dirs: update.dirs,
+      persistent: !!update.persistent,
+    };
   }
   const credits = { ...state.credits };
   credits[player] -= cost;
+  const normalizedAssignments = Object.keys(assignments).reduce<Record<string, Assignment>>((acc, key) => {
+    const value = assignments[key];
+    acc[key] = { ...value, persistent: !!value.persistent };
+    return acc;
+  }, {});
   const assignmentsState = {
     ...state.assignments,
-    [player]: { ...assignments },
+    [player]: normalizedAssignments,
   };
   const base: GameState = {
     ...state,
@@ -334,8 +345,13 @@ function handleMovementMove(state: GameState, stoneId: string, r: number, c: num
   if (occupantId) {
     const occ = stones[occupantId];
     if (occ) delete stones[occ.id];
-    delete stones[stone.id];
-    board[r][c] = null;
+    if (stone.persistent) {
+      stones[stone.id] = { ...stone, r, c };
+      board[r][c] = stone.id;
+    } else {
+      delete stones[stone.id];
+      board[r][c] = null;
+    }
     lastPlacementId = undefined;
   } else {
     stones[stone.id] = { ...stone, r, c };
@@ -393,13 +409,18 @@ function handleMovementPass(state: GameState): GameState {
 export function calculateAssignmentCost(assignments: Record<string, Assignment>): number {
   let total = 0;
   for (const id of Object.keys(assignments)) {
-    const { d, dirs } = assignments[id];
+    const { d, dirs, persistent } = assignments[id];
     const bits =
       (dirs & DIR.R ? 1 : 0) +
       (dirs & DIR.L ? 1 : 0) +
       (dirs & DIR.U ? 1 : 0) +
-      (dirs & DIR.D ? 1 : 0);
-    total += d * bits;
+      (dirs & DIR.D ? 1 : 0) +
+      (dirs & DIR.UR ? 1 : 0) +
+      (dirs & DIR.UL ? 1 : 0) +
+      (dirs & DIR.DR ? 1 : 0) +
+      (dirs & DIR.DL ? 1 : 0);
+    const extras = persistent ? 1 : 0;
+    total += d * (bits + extras);
   }
   return total;
 }

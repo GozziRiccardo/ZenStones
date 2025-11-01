@@ -18,6 +18,10 @@ export function legalMoves(state:GameState, s:Stone): {r:number;c:number}[] {
     [0,-1, DIR.L],
     [-1,0, DIR.U],
     [1, 0, DIR.D],
+    [-1, 1, DIR.UR],
+    [-1,-1, DIR.UL],
+    [1, 1, DIR.DR],
+    [1,-1, DIR.DL],
   ];
   const out: {r:number;c:number}[] = [];
   for (const [dr, dc, bit] of deltas) {

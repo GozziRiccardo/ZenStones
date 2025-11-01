@@ -21,6 +21,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
       map[s.id] = {
         d: (s.d ?? 1) as Assignment['d'],
         dirs: s.dirs ?? 0,
+        persistent: !!s.persistent,
       };
     }
     return map;
@@ -32,6 +33,10 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
   const toggleDir=(id:string, bit:number)=> {
     onFocusStone?.(id);
     setVals((v:AssignMap)=>({ ...v, [id]: { ...v[id], dirs: (v[id].dirs ^ bit) }}));
+  };
+  const togglePersistence=(id:string)=> {
+    onFocusStone?.(id);
+    setVals((v:AssignMap)=>({ ...v, [id]: { ...v[id], persistent: !v[id].persistent }}));
   };
   const setD=(id:string, d:Assignment['d'])=> {
     onFocusStone?.(id);
@@ -47,7 +52,13 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
     const first = vals[stones[0].id];
     if (!first) return;
     const next:AssignMap = {};
-    for (const s of stones) next[s.id] = { ...first };
+    for (const s of stones) {
+      next[s.id] = {
+        d: first.d,
+        dirs: first.dirs ?? 0,
+        persistent: !!first.persistent,
+      };
+    }
     setVals(next);
   };
 
@@ -58,7 +69,11 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
     const next:AssignMap = {};
     stones.forEach((s, idx)=>{
       const ref = entries[idx % entries.length];
-      next[s.id] = { ...ref };
+      next[s.id] = {
+        d: ref.d,
+        dirs: ref.dirs ?? 0,
+        persistent: !!ref.persistent,
+      };
     });
     setVals(next);
   };
@@ -67,7 +82,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
     <div className="panel card" style={{width:'100%'}}>
       <div className="row gap" style={{alignItems:'center'}}>
         <div>
-          <b>Assign stats for {player}</b> — cost = distance × number_of_directions.
+          <b>Assign stats for {player}</b> — cost = distance × number_of_options (directions + persistence).
           Remaining credits: <b>{state.credits[player]}</b>. Planned spend: <b>{cost}</b>.
         </div>
         <div className="row gap" style={{flexWrap:'wrap'}}>
@@ -77,13 +92,21 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
       </div>
       {insufficient ? <div className="warning">Warning: planned spend exceeds remaining credits.</div> : null}
       <table className="table">
-        <thead><tr><th>Square / ID</th><th>Pos</th><th>Distance</th><th>Directions</th><th>Cost</th></tr></thead>
+        <thead><tr><th>Square / ID</th><th>Distance</th><th>Options</th><th>Cost</th></tr></thead>
         <tbody>
           {stones.map(s=>{
             const v = vals[s.id];
             const dirs = v?.dirs ?? 0;
-            const bits = (dirs & DIR.R ? 1:0)+(dirs & DIR.L ? 1:0)+(dirs & DIR.U ? 1:0)+(dirs & DIR.D ? 1:0);
-            const rowCost = v ? v.d * bits : 0;
+            const bits =
+              (dirs & DIR.R ? 1:0)+
+              (dirs & DIR.L ? 1:0)+
+              (dirs & DIR.U ? 1:0)+
+              (dirs & DIR.D ? 1:0)+
+              (dirs & DIR.UR ? 1:0)+
+              (dirs & DIR.UL ? 1:0)+
+              (dirs & DIR.DR ? 1:0)+
+              (dirs & DIR.DL ? 1:0);
+            const rowCost = v ? v.d * (bits + (v.persistent ? 1 : 0)) : 0;
             const labelGrid = player === 'W' ? state.labels.whiteHalf : state.labels.blackHalf;
             const squareNumber = labelGrid[s.r]?.[s.c] ?? '-';
             return (
@@ -94,7 +117,6 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                     <div className="stone-label-id">{s.id}</div>
                   </div>
                 </td>
-                <td>({s.r},{s.c})</td>
                 <td>
                   <select
                     className="input"
@@ -110,10 +132,25 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                   </select>
                 </td>
                 <td className="dir-cell">
-                  <DirCheckbox label="→" checked={!!(dirs & DIR.R)} onChange={()=>toggleDir(s.id, DIR.R)} onFocus={()=>onFocusStone?.(s.id)} />
-                  <DirCheckbox label="←" checked={!!(dirs & DIR.L)} onChange={()=>toggleDir(s.id, DIR.L)} onFocus={()=>onFocusStone?.(s.id)} />
-                  <DirCheckbox label="↑" checked={!!(dirs & DIR.U)} onChange={()=>toggleDir(s.id, DIR.U)} onFocus={()=>onFocusStone?.(s.id)} />
-                  <DirCheckbox label="↓" checked={!!(dirs & DIR.D)} onChange={()=>toggleDir(s.id, DIR.D)} onFocus={()=>onFocusStone?.(s.id)} />
+                  <div className="dir-grid">
+                    <DirCheckbox label="↖" checked={!!(dirs & DIR.UL)} onChange={()=>toggleDir(s.id, DIR.UL)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="↑" checked={!!(dirs & DIR.U)} onChange={()=>toggleDir(s.id, DIR.U)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="↗" checked={!!(dirs & DIR.UR)} onChange={()=>toggleDir(s.id, DIR.UR)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="←" checked={!!(dirs & DIR.L)} onChange={()=>toggleDir(s.id, DIR.L)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <div className="dir-center" />
+                    <DirCheckbox label="→" checked={!!(dirs & DIR.R)} onChange={()=>toggleDir(s.id, DIR.R)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="↙" checked={!!(dirs & DIR.DL)} onChange={()=>toggleDir(s.id, DIR.DL)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="↓" checked={!!(dirs & DIR.D)} onChange={()=>toggleDir(s.id, DIR.D)} onFocus={()=>onFocusStone?.(s.id)} />
+                    <DirCheckbox label="↘" checked={!!(dirs & DIR.DR)} onChange={()=>toggleDir(s.id, DIR.DR)} onFocus={()=>onFocusStone?.(s.id)} />
+                  </div>
+                  <div className="persistence-toggle">
+                    <DirCheckbox
+                      label="Persistence"
+                      checked={!!v?.persistent}
+                      onChange={()=>togglePersistence(s.id)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                    />
+                  </div>
                 </td>
                 <td>{rowCost}</td>
               </tr>
