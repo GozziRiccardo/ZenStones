@@ -1,53 +1,42 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 import { auth } from '../lib/firebase';
-import { resendVerificationEmail, sendVerificationEmail } from '../lib/auth';
+import { resendVerificationEmail, watchAuth } from '../lib/auth';
 
 export default function VerifySentPage() {
   const [status, setStatus] = React.useState<'idle' | 'pending' | 'sent' | 'error'>('idle');
-  const [message, setMessage] = React.useState<string | null>(null);
-  const [initialized, setInitialized] = React.useState(false);
+  const [message, setMessage] = React.useState<string>(() => {
+    const email = auth.currentUser?.email;
+    return email
+      ? `We sent a verification email to ${email} when you created your account.`
+      : 'We sent you a verification email when you created your account. Check your inbox.';
+  });
 
   React.useEffect(() => {
-    if (initialized) {
-      return;
-    }
-    setInitialized(true);
-    const user = auth.currentUser;
-    if (!user) {
-      setMessage('Please log in to verify your email.');
-      setStatus('error');
-      return;
-    }
-    let cancelled = false;
-    setStatus('pending');
-    setMessage(null);
-    sendVerificationEmail(user)
-      .then(() => {
-        if (cancelled) return;
-        setStatus('sent');
-        setMessage('Verification email sent. Check your inbox.');
-      })
-      .catch((err) => {
-        if (cancelled) return;
+    const unsubscribe = watchAuth((user) => {
+      if (!user) {
         setStatus('error');
-        const text = err instanceof Error ? err.message : 'Unable to send email';
-        setMessage(text);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [initialized]);
+        setMessage('Please log in to verify your email.');
+        return;
+      }
+      setStatus((prev) => (prev === 'pending' ? prev : 'idle'));
+      setMessage(
+        `We sent a verification email to ${user.email ?? 'your address'} when you created your account.`,
+      );
+    });
+    return unsubscribe;
+  }, []);
 
   async function handleResend() {
     const user = auth.currentUser;
     if (!user) {
+      setStatus('error');
       setMessage('Please log in to resend the email.');
       return;
     }
     try {
       setStatus('pending');
-      setMessage(null);
+      setMessage('Sending verification email…');
       await resendVerificationEmail();
       setStatus('sent');
       setMessage('Verification email sent. Check your inbox.');
@@ -70,13 +59,11 @@ export default function VerifySentPage() {
           Already clicked the link? <Link to="/auth/verify-complete">Continue</Link>.
         </p>
         <button className="btn outline" type="button" onClick={handleResend} disabled={status === 'pending'}>
-          {status === 'pending' ? 'Sending…' : 'Resend verification email'}
+          {status === 'pending' ? 'Sending…' : 'Send another email'}
         </button>
-        {message ? (
-          <div className="small" style={{ color: status === 'error' ? 'var(--stone-600)' : 'var(--stone-700)' }}>
-            {message}
-          </div>
-        ) : null}
+        <div className="small" style={{ color: status === 'error' ? 'var(--stone-600)' : 'var(--stone-700)' }}>
+          {message}
+        </div>
       </div>
     </div>
   );
