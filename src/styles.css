@@ -107,9 +107,9 @@ hr{border:none;border-top:1px solid #f1f5f9;margin:12px 0}
 .dir-check.hide-box{gap:0}
 .dir-check.hide-box input{position:absolute;inset:0;opacity:0;margin:0;width:100%;height:100%;cursor:pointer}
 .dir-check.hide-box input:focus{outline:none}
-.dir-check.hide-box .dir-symbol{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1px solid rgba(148,163,184,0.55);background:rgba(255,255,255,0.85);color:var(--slate-600);font-size:18px;line-height:1;transition:all 0.15s ease;min-width:28px}
-.dir-check.hide-box input:checked + .dir-symbol{background:rgba(244,63,94,0.16);color:#be123c;border-color:rgba(244,63,94,0.45)}
-.dir-check.hide-box input:focus-visible + .dir-symbol{outline:none}
+.dir-check.hide-box .dir-symbol{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-width:28px;font-size:18px;line-height:1;color:var(--slate-900);transition:color 0.15s ease;position:relative;border-radius:6px}
+.dir-check.hide-box input:checked + .dir-symbol{color:#be123c}
+.dir-check.hide-box input:focus-visible + .dir-symbol{outline:2px solid rgba(244,63,94,0.35);outline-offset:2px}
 .small-btn{font-size:12px;padding:4px 8px}
 .warning{margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(254,202,202,0.6);color:#b91c1c;font-size:13px}
 
