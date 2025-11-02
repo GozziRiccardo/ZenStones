@@ -1,11 +1,43 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 import { auth } from '../lib/firebase';
-import { resendVerificationEmail } from '../lib/auth';
+import { resendVerificationEmail, sendVerificationEmail } from '../lib/auth';
 
 export default function VerifySentPage() {
   const [status, setStatus] = React.useState<'idle' | 'pending' | 'sent' | 'error'>('idle');
   const [message, setMessage] = React.useState<string | null>(null);
+  const [initialized, setInitialized] = React.useState(false);
+
+  React.useEffect(() => {
+    if (initialized) {
+      return;
+    }
+    setInitialized(true);
+    const user = auth.currentUser;
+    if (!user) {
+      setMessage('Please log in to verify your email.');
+      setStatus('error');
+      return;
+    }
+    let cancelled = false;
+    setStatus('pending');
+    setMessage(null);
+    sendVerificationEmail(user)
+      .then(() => {
+        if (cancelled) return;
+        setStatus('sent');
+        setMessage('Verification email sent. Check your inbox.');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setStatus('error');
+        const text = err instanceof Error ? err.message : 'Unable to send email';
+        setMessage(text);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialized]);
 
   async function handleResend() {
     const user = auth.currentUser;
@@ -41,7 +73,7 @@ export default function VerifySentPage() {
           {status === 'pending' ? 'Sending…' : 'Resend verification email'}
         </button>
         {message ? (
-          <div className="small" style={{ color: status === 'error' ? '#b91c1c' : '#475569' }}>
+          <div className="small" style={{ color: status === 'error' ? 'var(--stone-600)' : 'var(--stone-700)' }}>
             {message}
           </div>
         ) : null}

@@ -62,7 +62,7 @@ export default function NicknamePage() {
           onChange={(event) => setNickname(normalize(event.target.value))}
         />
         {error ? (
-          <div className="small" style={{ color: '#b91c1c' }}>
+          <div className="small" style={{ color: 'var(--stone-600)' }}>
             {error}
           </div>
         ) : null}
