@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -31,6 +32,11 @@ type QuickRequestState = {
   opponentNickname?: string;
 };
 
+type QuickRequestDoc = QuickRequestState & {
+  uid: string;
+  nickname: string;
+};
+
 export type MatchDoc = {
   id: string;
   status: 'active' | 'finished';
@@ -50,6 +56,8 @@ export async function requestQuickMatch(nickname: string) {
   const requestRef = doc(db, 'quickRequests', user.uid);
   const requests = collection(db, 'quickRequests');
   const openQuery = query(requests, orderBy('createdAt', 'asc'), limit(10));
+  const candidateSnapshots = await getDocs(openQuery);
+  const candidateIds = candidateSnapshots.docs.map((docSnap) => docSnap.id);
 
   return runTransaction(db, async (transaction) => {
     const existing = await transaction.get(requestRef);
@@ -69,22 +77,33 @@ export async function requestQuickMatch(nickname: string) {
       }
     }
 
-    const openSnap = await transaction.get(openQuery);
-    const first = openSnap.docs.find((docSnap) => {
-      const data = docSnap.data() as { status?: string };
-      return data.status === 'open' && docSnap.id !== user.uid;
-    });
-    if (first) {
-      const firstData = first.data() as { uid: string; nickname: string };
+    for (const candidateId of candidateIds) {
+      if (candidateId === user.uid) {
+        continue;
+      }
+      const candidateRef = doc(db, 'quickRequests', candidateId);
+      const candidateSnap = await transaction.get(candidateRef);
+      if (!candidateSnap.exists()) {
+        continue;
+      }
+      const candidateData = candidateSnap.data() as QuickRequestDoc;
+      if (candidateData.status !== 'open') {
+        continue;
+      }
+      const candidateUid = typeof candidateData.uid === 'string' ? candidateData.uid : candidateRef.id;
+      const candidateNickname = typeof candidateData.nickname === 'string' ? candidateData.nickname : '';
+      if (!candidateUid || !candidateNickname) {
+        continue;
+      }
       const matchRef = doc(collection(db, 'matches'));
-      transaction.update(first.ref, {
+      transaction.update(candidateRef, {
         status: 'matched',
         opponentUid: user.uid,
         opponentNickname: nickname,
         matchId: matchRef.id,
         matchedAt: serverTimestamp(),
       });
-      transaction.set(doc(db, 'quickRequests', user.uid), {
+      transaction.set(requestRef, {
         uid: user.uid,
         nickname,
         status: 'matched',
@@ -95,10 +114,10 @@ export async function requestQuickMatch(nickname: string) {
         status: 'active',
         createdAt: serverTimestamp(),
         mode: 'quickplay',
-        playerUids: [firstData.uid, user.uid],
+        playerUids: [candidateUid, user.uid],
         players: {
-          [firstData.uid]: {
-            nickname: firstData.nickname,
+          [candidateUid]: {
+            nickname: candidateNickname,
           },
           [user.uid]: {
             nickname,
