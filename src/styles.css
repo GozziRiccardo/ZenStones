@@ -13,7 +13,11 @@
 
 *{box-sizing:border-box}
 html,body,#root{height:100%}
-body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,Apple Color Emoji,Segoe UI Emoji;background:var(--rose-50);color:var(--slate-700)}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,Apple Color Emoji,Segoe UI Emoji;background-color:var(--rose-50);background-image:url('/images/background_mobile.jpg');background-repeat:no-repeat;background-size:cover;color:var(--slate-700)}
+
+@media (min-width:768px){
+  body{background-image:url('/images/background_desktop.jpg')}
+}
 
 .container{max-width:1100px;margin:0 auto;padding:24px}
 .h1{font-size:28px;font-weight:800;color:var(--rose-500);margin:0 0 12px}
@@ -86,6 +90,9 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,
 .input{padding:6px 10px;border-radius:10px;border:1px solid var(--rose-300);}
 .number{width:80px}
 .small{font-size:12px;color:#475569}
+.signed-in{display:flex;flex-direction:column;align-items:flex-end;text-align:right;line-height:1.2}
+.signed-in-label{font-size:11px;color:rgba(71,85,105,0.85)}
+.signed-in-name{font-weight:700;color:var(--slate-900)}
 .table{width:100%;border-collapse:collapse}
 .table th,.table td{border-bottom:1px solid #f1f5f9;padding:6px 8px;text-align:left}
 .table tr.selected{background:rgba(244,63,94,0.08)}

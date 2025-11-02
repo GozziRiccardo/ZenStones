@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import './styles.css';
 import type { Assignment, GameState, Player } from './game/types';
 import { legalMoves, squareCostForPlayer, restoreIdCounter, hasPlacementOption } from './game/utils';
@@ -10,6 +11,7 @@ import { AssignStatsPanel } from './panels/AssignStatsPanel';
 import { ScoresPanel } from './panels/ScoresPanel';
 import { MovementBiddingPanel } from './panels/MovementBiddingPanel';
 import { createInitialState, gameReducer, getTickingMode } from './game/state';
+import { useAuth } from './auth/AuthContext';
 
 const TICK_INTERVAL = 100;
 const STATE_STORAGE_KEY = 'zenstones-state';
@@ -47,6 +49,7 @@ function loadPersistedState(): GameState | null {
 type Toast = { id: number; message: string };
 
 export default function App() {
+  const navigate = useNavigate();
   const [state, dispatch] = React.useReducer(
     gameReducer,
     undefined,
@@ -56,6 +59,8 @@ export default function App() {
   const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
   const [blockedPreview, setBlockedPreview] = React.useState<{ r: number; c: number } | null>(null);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
+  const { nickname, logout } = useAuth();
+  const [loggingOut, setLoggingOut] = React.useState(false);
   const toastId = React.useRef(0);
   const lastTick = React.useRef<number>(Date.now());
   const toastTimers = React.useRef<Record<number, number>>({});
@@ -306,6 +311,23 @@ export default function App() {
     }
   };
 
+  const handleLogout = React.useCallback(async () => {
+    try {
+      setLoggingOut(true);
+      await logout();
+      try {
+        window.localStorage.removeItem(STATE_STORAGE_KEY);
+      } catch {
+        // ignore storage cleanup errors
+      }
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.warn('Failed to log out:', err);
+    } finally {
+      setLoggingOut(false);
+    }
+  }, [logout, navigate]);
+
   const mustPass = React.useMemo(() => {
     if (state.phase !== 'MOVEMENT' || !state.turn) return false;
     return !Object.values(state.stones).some((stone) => {
@@ -320,8 +342,15 @@ export default function App() {
     <div className="container">
       <div className="row">
         <div className="h1">ZenStones</div>
-        <div className="row gap">
+        <div className="row gap" style={{ alignItems: 'center' }}>
+          <div className="signed-in">
+            <span className="signed-in-label">Signed in as</span>
+            <span className="signed-in-name">{nickname}</span>
+          </div>
           <button className="btn outline" onClick={handleReset}>New Game</button>
+          <button className="btn outline" onClick={handleLogout} disabled={loggingOut}>
+            {loggingOut ? 'Logging out…' : 'Logout'}
+          </button>
         </div>
       </div>
 

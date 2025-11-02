@@ -1,15 +1,17 @@
 import * as React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { auth } from '../lib/firebase';
-import { userHasNickname } from '../lib/nickname';
+import { getUserNickname } from '../lib/nickname';
 import { watchAuth } from '../lib/auth';
+import { AuthProvider } from './AuthContext';
 
 export function Protected({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [userState, setUserState] = React.useState(() => ({
     loading: true,
-    hasNickname: false,
+    hasNickname: null as boolean | null,
     checkingNickname: false,
+    nickname: null as string | null,
   }));
   const [currentUser, setCurrentUser] = React.useState(() => auth.currentUser);
 
@@ -28,18 +30,33 @@ export function Protected({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     async function checkNickname() {
       if (!currentUser || !currentUser.emailVerified) {
-        setUserState((prev) => ({ ...prev, hasNickname: false, checkingNickname: false }));
+        setUserState((prev) => ({
+          ...prev,
+          hasNickname: null,
+          checkingNickname: false,
+          nickname: null,
+        }));
         return;
       }
-      setUserState((prev) => ({ ...prev, checkingNickname: true }));
+      setUserState((prev) => ({ ...prev, checkingNickname: true, hasNickname: null }));
       try {
-        const has = await userHasNickname(currentUser.uid);
+        const nickname = await getUserNickname(currentUser.uid);
         if (!cancelled) {
-          setUserState((prev) => ({ ...prev, hasNickname: has, checkingNickname: false }));
+          setUserState((prev) => ({
+            ...prev,
+            hasNickname: Boolean(nickname),
+            checkingNickname: false,
+            nickname: nickname,
+          }));
         }
       } catch (err) {
         if (!cancelled) {
-          setUserState((prev) => ({ ...prev, hasNickname: false, checkingNickname: false }));
+          setUserState((prev) => ({
+            ...prev,
+            hasNickname: false,
+            checkingNickname: false,
+            nickname: null,
+          }));
         }
       }
     }
@@ -49,7 +66,11 @@ export function Protected({ children }: { children: React.ReactNode }) {
     };
   }, [currentUser]);
 
-  if (userState.loading || userState.checkingNickname) {
+  if (
+    userState.loading ||
+    userState.checkingNickname ||
+    (currentUser?.emailVerified && userState.hasNickname === null)
+  ) {
     return (
       <div className="container">
         <div className="card" style={{ maxWidth: 360 }}>
@@ -67,9 +88,13 @@ export function Protected({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth/verify-sent" replace />;
   }
 
-  if (!userState.hasNickname) {
+  if (userState.hasNickname === false) {
     return <Navigate to="/nickname" replace />;
   }
 
-  return <>{children}</>;
+  if (!userState.nickname) {
+    return null;
+  }
+
+  return <AuthProvider user={currentUser} nickname={userState.nickname}>{children}</AuthProvider>;
 }
