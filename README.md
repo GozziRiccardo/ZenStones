@@ -23,3 +23,17 @@ npm run dev
 ## Working with Codex
 
 Open **Issues** and use the **Task** template. Keep each change small and specific.
+
+## Auth & Firebase
+
+- Enable Firebase Authentication (Email/Password) and require email verification.
+- Add your Cloudflare Pages domain(s) to the Firebase authorized domains list.
+- Enable Firestore in Native mode for nickname storage.
+- Provide the Firebase configuration values as `VITE_FIREBASE_*` environment variables in Cloudflare Pages (Project → Settings → Environment Variables).
+- Deploy, then access routes:
+  - `/` — registration
+  - `/login` — log in
+  - `/auth/verify-sent` — verification reminder/resend
+  - `/auth/verify-complete` — post-verification landing
+  - `/nickname` — nickname claim (after verification)
+  - `/play` — game (requires verified account with nickname)
