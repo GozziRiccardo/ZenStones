@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { claimNickname, normalize } from '../lib/nickname';
 
 export default function NicknamePage() {
@@ -18,6 +19,23 @@ export default function NicknamePage() {
     if (!user.emailVerified) {
       navigate('/auth/verify-sent', { replace: true });
     }
+  }, [navigate]);
+
+  React.useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || !user.emailVerified) {
+      return;
+    }
+    const ref = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(ref, (snap) => {
+      const data = snap.data();
+      const existing = typeof data?.nickname === 'string' ? data.nickname.trim() : '';
+      if (existing.length > 0) {
+        localStorage.removeItem('pendingNickname');
+        navigate('/play', { replace: true });
+      }
+    });
+    return unsubscribe;
   }, [navigate]);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -40,6 +58,10 @@ export default function NicknamePage() {
           setError('Nickname already taken. Try a different one.');
         } else if (err.message === 'BAD_NICK') {
           setError('Nickname must be 3-20 characters (a-z, 0-9, _).');
+        } else if (err.message === 'ALREADY_SET') {
+          localStorage.removeItem('pendingNickname');
+          navigate('/play', { replace: true });
+          return;
         } else {
           setError('Could not claim nickname.');
         }
@@ -59,7 +81,11 @@ export default function NicknamePage() {
           className="input"
           placeholder="nickname (3-20 characters)"
           value={nickname}
-          onChange={(event) => setNickname(normalize(event.target.value))}
+          onChange={(event) => {
+            const value = normalize(event.target.value);
+            setNickname(value);
+            localStorage.setItem('pendingNickname', value);
+          }}
         />
         {error ? (
           <div className="small" style={{ color: 'var(--stone-600)' }}>

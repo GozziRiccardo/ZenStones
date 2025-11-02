@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { auth } from '../lib/firebase';
-import { getUserNickname } from '../lib/nickname';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { watchAuth } from '../lib/auth';
 import { AuthProvider } from './AuthContext';
 
@@ -27,43 +27,42 @@ export function Protected({ children }: { children: React.ReactNode }) {
   }, []);
 
   React.useEffect(() => {
-    let cancelled = false;
-    async function checkNickname() {
-      if (!currentUser || !currentUser.emailVerified) {
+    if (!currentUser || !currentUser.emailVerified) {
+      setUserState((prev) => ({
+        ...prev,
+        hasNickname: null,
+        checkingNickname: false,
+        nickname: null,
+      }));
+      return;
+    }
+
+    setUserState((prev) => ({ ...prev, checkingNickname: true, hasNickname: null }));
+
+    const ref = doc(db, 'users', currentUser.uid);
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => {
+        const data = snap.data();
+        const nick = typeof data?.nickname === 'string' ? data.nickname.trim() : '';
         setUserState((prev) => ({
           ...prev,
-          hasNickname: null,
+          hasNickname: nick.length > 0,
+          checkingNickname: false,
+          nickname: nick.length > 0 ? nick : null,
+        }));
+      },
+      () => {
+        setUserState((prev) => ({
+          ...prev,
+          hasNickname: false,
           checkingNickname: false,
           nickname: null,
         }));
-        return;
-      }
-      setUserState((prev) => ({ ...prev, checkingNickname: true, hasNickname: null }));
-      try {
-        const nickname = await getUserNickname(currentUser.uid);
-        if (!cancelled) {
-          setUserState((prev) => ({
-            ...prev,
-            hasNickname: Boolean(nickname),
-            checkingNickname: false,
-            nickname: nickname,
-          }));
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setUserState((prev) => ({
-            ...prev,
-            hasNickname: false,
-            checkingNickname: false,
-            nickname: null,
-          }));
-        }
-      }
-    }
-    checkNickname();
-    return () => {
-      cancelled = true;
-    };
+      },
+    );
+
+    return unsubscribe;
   }, [currentUser]);
 
   if (

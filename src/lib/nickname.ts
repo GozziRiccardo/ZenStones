@@ -33,6 +33,12 @@ export async function claimNickname(input: string) {
     const handleDoc = await transaction.get(handleRef);
     const userDoc = await transaction.get(userRef);
     const existingUser = userDoc.exists() ? userDoc.data() : null;
+    const existingNickname = typeof existingUser?.nickname === 'string'
+      ? normalize(existingUser.nickname)
+      : '';
+    if (existingNickname && existingNickname !== nickname) {
+      throw new Error('ALREADY_SET');
+    }
     if (handleDoc.exists() && handleDoc.data()?.uid !== user.uid) {
       throw new Error('TAKEN');
     }
