@@ -31,6 +31,8 @@ export async function claimNickname(input: string) {
 
   await runTransaction(db, async (transaction) => {
     const handleDoc = await transaction.get(handleRef);
+    const userDoc = await transaction.get(userRef);
+    const existingUser = userDoc.exists() ? userDoc.data() : null;
     if (handleDoc.exists() && handleDoc.data()?.uid !== user.uid) {
       throw new Error('TAKEN');
     }
@@ -46,7 +48,9 @@ export async function claimNickname(input: string) {
         uid: user.uid,
         email: user.email ?? null,
         nickname,
-        createdAt: serverTimestamp(),
+        elo: existingUser && typeof existingUser.elo === 'number' ? existingUser.elo : 100,
+        createdAt: existingUser?.createdAt ?? serverTimestamp(),
+        updatedAt: serverTimestamp(),
       },
       { merge: true },
     );
