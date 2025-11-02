@@ -88,25 +88,25 @@ function ProfileView() {
 
   React.useEffect(() => () => {
     if (queueStatusRef.current === 'waiting') {
-      cancelQuickMatch().catch(() => undefined);
+      cancelQuickMatch(user.uid).catch(() => undefined);
     }
-  }, []);
+  }, [user.uid]);
 
   const handleLogout = React.useCallback(async () => {
     try {
-      await cancelQuickMatch();
+      await cancelQuickMatch(user.uid);
     } catch {
       // ignore queue cancellation errors during logout
     }
     await logout();
     navigate('/login', { replace: true });
-  }, [logout, navigate]);
+  }, [logout, navigate, user.uid]);
 
   const handleQuickMatch = async () => {
     setQueueError(null);
     setChallengeMessage(null);
     try {
-      const result = await requestQuickMatch(nickname);
+      const result = await requestQuickMatch(user.uid, nickname);
       if (result.kind === 'waiting') {
         setQueueStatus('waiting');
       } else if (result.kind === 'matched') {
@@ -127,7 +127,7 @@ function ProfileView() {
   };
 
   const handleCancelQuickMatch = async () => {
-    await cancelQuickMatch();
+    await cancelQuickMatch(user.uid);
     setQueueStatus('idle');
   };
 
@@ -138,7 +138,7 @@ function ProfileView() {
     }
     setChallengeError(null);
     try {
-      await sendChallenge(challengeNickname, nickname);
+      await sendChallenge(challengeNickname, user.uid, nickname);
       setChallengeMessage('Challenge sent');
       setChallengeNickname('');
       setChallengeOpen(false);
@@ -169,7 +169,7 @@ function ProfileView() {
     setChallengeError(null);
     setAcceptingChallengeId(challenge.id);
     try {
-      const matchId = await acceptChallenge(challenge.id);
+      const matchId = await acceptChallenge(challenge.id, user.uid);
       matchedRef.current = matchId;
       navigate(`/match/${matchId}`);
     } catch (err) {
@@ -181,7 +181,7 @@ function ProfileView() {
 
   const handleDenyChallenge = async (challenge: ChallengeSnapshot) => {
     setChallengeError(null);
-    await denyChallenge(challenge.id);
+    await denyChallenge(challenge.id, user.uid);
   };
 
   const waitingForOpponent = queueStatus === 'waiting';

@@ -14,10 +14,10 @@
 *{box-sizing:border-box}
 html,body,#root{height:100%}
 body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,Apple Color Emoji,Segoe UI Emoji;background-color:var(--rose-50);color:var(--slate-700)}
-body::before{content:"";position:fixed;inset:0;z-index:-1;background-image:url('/images/background_mobile.png');background-repeat:no-repeat;background-size:cover;background-position:center;}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background-image:url('./images/background_mobile.png');background-repeat:no-repeat;background-size:cover;background-position:center;}
 
 @media (min-width:768px){
-  body::before{background-image:url('/images/background_desktop.png')}
+  body::before{background-image:url('./images/background_desktop.png')}
 }
 
 .container{max-width:1100px;margin:0 auto;padding:24px}
