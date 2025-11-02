@@ -221,8 +221,17 @@ export async function sendChallenge(rawNickname: string, challengerUid: string, 
   if (targetUid === challengerUid) {
     throw new Error('SELF');
   }
-  const targetUserSnap = await getDoc(doc(db, 'users', targetUid));
-  const targetNickname = typeof targetUserSnap.data()?.nickname === 'string' ? targetUserSnap.data()!.nickname : normalized;
+  const fallbackNickname = rawNickname.trim() || normalized;
+  let targetNickname = fallbackNickname;
+  try {
+    const targetProfileSnap = await getDoc(doc(db, 'profiles', targetUid));
+    const targetProfile = targetProfileSnap.data();
+    if (typeof targetProfile?.nickname === 'string' && targetProfile.nickname.trim()) {
+      targetNickname = targetProfile.nickname;
+    }
+  } catch (err) {
+    // Ignore errors when loading the public profile and fall back to the handle.
+  }
 
   const challengeRef = doc(collection(db, 'challenges'));
   await setDoc(challengeRef, {
