@@ -52,7 +52,7 @@ export default function NicknamePage() {
   }
 
   return (
-    <div className="container">
+    <div className="container centered-container">
       <h1 className="h1">Choose your nickname</h1>
       <form className="card" style={{ maxWidth: 420 }} onSubmit={handleSubmit}>
         <input

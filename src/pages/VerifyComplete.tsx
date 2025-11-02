@@ -73,7 +73,7 @@ export default function VerifyCompletePage() {
   }, [navigate, searchParams]);
 
   return (
-    <div className="container">
+    <div className="container centered-container">
       <div className="card" style={{ maxWidth: 420 }}>
         <p className="small">{message}</p>
       </div>

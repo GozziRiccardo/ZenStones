@@ -59,7 +59,7 @@ export default function VerifySentPage() {
   }
 
   return (
-    <div className="container">
+    <div className="container centered-container">
       <h1 className="h1">Check your inbox</h1>
       <div className="card" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <p>
