@@ -44,7 +44,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="container">
+    <div className="container login-container">
       <h1 className="h1">ZenStones — Log in</h1>
       <form className="card" style={{ maxWidth: 420 }} onSubmit={handleSubmit}>
         <div className="row gap">
