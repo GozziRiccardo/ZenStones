@@ -221,8 +221,16 @@ export async function sendChallenge(rawNickname: string, challengerUid: string, 
   if (targetUid === challengerUid) {
     throw new Error('SELF');
   }
-  const targetUserSnap = await getDoc(doc(db, 'users', targetUid));
-  const targetNickname = typeof targetUserSnap.data()?.nickname === 'string' ? targetUserSnap.data()!.nickname : normalized;
+  // Prefer public profile nickname; fall back to normalized handle.
+  // (profiles is public-read per our rules)
+  let targetNickname = normalized;
+  try {
+    const profSnap = await getDoc(doc(db, 'profiles', targetUid));
+    const nick = profSnap.data()?.nickname;
+    if (typeof nick === 'string' && nick.trim()) targetNickname = nick.trim();
+  } catch {
+    // ignore; we'll use the normalized handle
+  }
 
   const challengeRef = doc(collection(db, 'challenges'));
   await setDoc(challengeRef, {
