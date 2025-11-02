@@ -49,7 +49,7 @@ function MatchView() {
 
   if (status === 'loading') {
     return (
-      <div className="container">
+      <div className="container centered-container">
         <div className="card" style={{ maxWidth: 360 }}>
           Loading match…
         </div>
