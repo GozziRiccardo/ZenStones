@@ -13,7 +13,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { db } from './firebase';
 import { normalize } from './nickname';
 
 export type ChallengeSnapshot = {
@@ -50,10 +50,9 @@ export function watchUserProfile(uid: string, handler: (data: Record<string, unk
   });
 }
 
-export async function requestQuickMatch(nickname: string) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('AUTH');
-  const requestRef = doc(db, 'quickRequests', user.uid);
+export async function requestQuickMatch(uid: string, nickname: string) {
+  if (!uid) throw new Error('AUTH');
+  const requestRef = doc(db, 'quickRequests', uid);
   const requests = collection(db, 'quickRequests');
   const openQuery = query(requests, orderBy('createdAt', 'asc'), limit(10));
   const candidateSnapshots = await getDocs(openQuery);
@@ -78,7 +77,7 @@ export async function requestQuickMatch(nickname: string) {
     }
 
     for (const candidateId of candidateIds) {
-      if (candidateId === user.uid) {
+      if (candidateId === uid) {
         continue;
       }
       const candidateRef = doc(db, 'quickRequests', candidateId);
@@ -98,13 +97,13 @@ export async function requestQuickMatch(nickname: string) {
       const matchRef = doc(collection(db, 'matches'));
       transaction.update(candidateRef, {
         status: 'matched',
-        opponentUid: user.uid,
+        opponentUid: uid,
         opponentNickname: nickname,
         matchId: matchRef.id,
         matchedAt: serverTimestamp(),
       });
       transaction.set(requestRef, {
-        uid: user.uid,
+        uid,
         nickname,
         status: 'matched',
         matchId: matchRef.id,
@@ -114,12 +113,12 @@ export async function requestQuickMatch(nickname: string) {
         status: 'active',
         createdAt: serverTimestamp(),
         mode: 'quickplay',
-        playerUids: [candidateUid, user.uid],
+        playerUids: [candidateUid, uid],
         players: {
           [candidateUid]: {
             nickname: candidateNickname,
           },
-          [user.uid]: {
+          [uid]: {
             nickname,
           },
         },
@@ -128,7 +127,7 @@ export async function requestQuickMatch(nickname: string) {
     }
 
     transaction.set(requestRef, {
-      uid: user.uid,
+      uid,
       nickname,
       status: 'open',
       createdAt: serverTimestamp(),
@@ -137,10 +136,9 @@ export async function requestQuickMatch(nickname: string) {
   });
 }
 
-export async function cancelQuickMatch() {
-  const user = auth.currentUser;
-  if (!user) return;
-  const ref = doc(db, 'quickRequests', user.uid);
+export async function cancelQuickMatch(uid: string) {
+  if (!uid) return;
+  const ref = doc(db, 'quickRequests', uid);
   await deleteDoc(ref).catch(() => undefined);
 }
 
@@ -206,9 +204,8 @@ export function watchActiveMatch(uid: string, handler: (match: MatchDoc | null) 
   });
 }
 
-export async function sendChallenge(rawNickname: string, challengerNickname: string) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('AUTH');
+export async function sendChallenge(rawNickname: string, challengerUid: string, challengerNickname: string) {
+  if (!challengerUid) throw new Error('AUTH');
   const normalized = normalize(rawNickname);
   if (!normalized) {
     throw new Error('BAD_NICK');
@@ -221,7 +218,7 @@ export async function sendChallenge(rawNickname: string, challengerNickname: str
   if (!targetUid) {
     throw new Error('NOT_FOUND');
   }
-  if (targetUid === user.uid) {
+  if (targetUid === challengerUid) {
     throw new Error('SELF');
   }
   const targetUserSnap = await getDoc(doc(db, 'users', targetUid));
@@ -231,7 +228,7 @@ export async function sendChallenge(rawNickname: string, challengerNickname: str
   await setDoc(challengeRef, {
     status: 'pending',
     createdAt: serverTimestamp(),
-    challengerUid: user.uid,
+    challengerUid,
     challengerNickname,
     targetUid,
     targetNickname,
@@ -253,9 +250,8 @@ export function watchIncomingChallenges(uid: string, handler: (items: ChallengeS
   });
 }
 
-export async function acceptChallenge(challengeId: string) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('AUTH');
+export async function acceptChallenge(challengeId: string, uid: string) {
+  if (!uid) throw new Error('AUTH');
   const challengeRef = doc(db, 'challenges', challengeId);
   return runTransaction(db, async (transaction) => {
     const snap = await transaction.get(challengeRef);
@@ -264,7 +260,7 @@ export async function acceptChallenge(challengeId: string) {
     if (data.status !== 'pending') {
       throw new Error('NOT_AVAILABLE');
     }
-    if (data.targetUid !== user.uid) {
+    if (data.targetUid !== uid) {
       throw new Error('NOT_ALLOWED');
     }
     const matchRef = doc(collection(db, 'matches'));
@@ -291,15 +287,14 @@ export async function acceptChallenge(challengeId: string) {
   });
 }
 
-export async function denyChallenge(challengeId: string) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('AUTH');
+export async function denyChallenge(challengeId: string, uid: string) {
+  if (!uid) throw new Error('AUTH');
   const ref = doc(db, 'challenges', challengeId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists()) return;
     const data = snap.data() as ChallengeSnapshot;
-    if (data.targetUid !== user.uid) return;
+    if (data.targetUid !== uid) return;
     if (data.status !== 'pending') return;
     transaction.update(ref, {
       status: 'denied',
