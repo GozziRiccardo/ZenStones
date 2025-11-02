@@ -1,13 +1,11 @@
 import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { register } from '../lib/auth';
-import { normalize } from '../lib/nickname';
+import { register, sendVerificationEmail } from '../lib/auth';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
-  const [nickname, setNickname] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
 
@@ -16,19 +14,17 @@ export default function RegisterPage() {
     setError(null);
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
-    const normalizedNickname = normalize(nickname);
-    if (!trimmedEmail || !trimmedPassword || !normalizedNickname) {
-      setError('Please provide email, password, and nickname.');
-      return;
-    }
-    if (normalizedNickname.length < 3 || normalizedNickname.length > 20) {
-      setError('Nickname must be 3-20 characters.');
+    if (!trimmedEmail || !trimmedPassword) {
+      setError('Please provide email and password.');
       return;
     }
     try {
       setPending(true);
-      await register(trimmedEmail, trimmedPassword, normalizedNickname);
+      const user = await register(trimmedEmail, trimmedPassword);
       navigate('/auth/verify-sent');
+      sendVerificationEmail(user).catch((err) => {
+        console.error('Failed to send verification email:', err);
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong';
       setError(message);
@@ -38,7 +34,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="container">
+    <div className="container login-container">
       <h1 className="h1">ZenStones — Sign up</h1>
       <form className="card" style={{ maxWidth: 420 }} onSubmit={handleSubmit}>
         <div className="row gap">
@@ -54,14 +50,6 @@ export default function RegisterPage() {
         <div className="row gap">
           <input
             className="input"
-            placeholder="Nickname"
-            value={nickname}
-            onChange={(event) => setNickname(event.target.value)}
-          />
-        </div>
-        <div className="row gap">
-          <input
-            className="input"
             type="password"
             placeholder="Password"
             autoComplete="new-password"
@@ -70,7 +58,7 @@ export default function RegisterPage() {
           />
         </div>
         {error ? (
-          <div className="small" style={{ color: '#b91c1c' }}>
+          <div className="small" style={{ color: 'var(--stone-600)' }}>
             {error}
           </div>
         ) : null}

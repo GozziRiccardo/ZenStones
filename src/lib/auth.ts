@@ -8,13 +8,16 @@ import {
 } from 'firebase/auth';
 import { auth } from './firebase';
 
-export async function register(email: string, password: string, nickname: string) {
+export async function register(email: string, password: string) {
   const credential = await createUserWithEmailAndPassword(auth, email, password);
-  await sendEmailVerification(credential.user, {
+  return credential.user;
+}
+
+export async function sendVerificationEmail(user?: User | null) {
+  const target = user ?? getCurrentUser();
+  await sendEmailVerification(target, {
     url: `${location.origin}/auth/verify-complete`,
   });
-  localStorage.setItem('pendingNickname', nickname);
-  return credential.user;
 }
 
 export async function login(email: string, password: string) {
@@ -47,8 +50,5 @@ export function requireVerifiedUser() {
 }
 
 export async function resendVerificationEmail() {
-  const user = getCurrentUser();
-  await sendEmailVerification(user, {
-    url: `${location.origin}/auth/verify-complete`,
-  });
+  await sendVerificationEmail();
 }

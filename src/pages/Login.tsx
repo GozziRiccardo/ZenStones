@@ -68,7 +68,7 @@ export default function LoginPage() {
           />
         </div>
         {error ? (
-          <div className="small" style={{ color: '#b91c1c' }}>
+          <div className="small" style={{ color: 'var(--stone-600)' }}>
             {error}
           </div>
         ) : null}
