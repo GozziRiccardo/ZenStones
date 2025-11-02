@@ -6,10 +6,16 @@ export function normalize(raw: string) {
 }
 
 export async function userHasNickname(uid: string) {
+  const nickname = await getUserNickname(uid);
+  return nickname !== null;
+}
+
+export async function getUserNickname(uid: string) {
   const snap = await getDoc(doc(db, 'users', uid));
-  if (!snap.exists()) return false;
+  if (!snap.exists()) return null;
   const data = snap.data();
-  return typeof data?.nickname === 'string' && data.nickname.length > 0;
+  const value = typeof data?.nickname === 'string' ? data.nickname.trim() : '';
+  return value.length > 0 ? value : null;
 }
 
 export async function claimNickname(input: string) {
