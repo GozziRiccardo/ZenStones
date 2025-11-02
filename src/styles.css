@@ -13,13 +13,16 @@
 
 *{box-sizing:border-box}
 html,body,#root{height:100%}
-body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,Apple Color Emoji,Segoe UI Emoji;background-color:var(--rose-50);background-image:url('/images/background_mobile.jpg');background-repeat:no-repeat;background-size:cover;color:var(--slate-700)}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,Apple Color Emoji,Segoe UI Emoji;background-color:var(--rose-50);background-image:url('/images/background_mobile.png');background-repeat:no-repeat;background-size:cover;background-position:center;color:var(--slate-700)}
 
 @media (min-width:768px){
-  body{background-image:url('/images/background_desktop.jpg')}
+  body{background-image:url('/images/background_desktop.png')}
 }
 
 .container{max-width:1100px;margin:0 auto;padding:24px}
+.login-container{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding-top:48px;padding-bottom:48px}
+.login-container .h1{text-align:center}
+.login-container .card{width:100%}
 .h1{font-size:28px;font-weight:800;color:var(--rose-500);margin:0 0 12px}
 .row{display:flex;gap:12px;align-items:center;justify-content:space-between}
 .card{background:rgba(255,255,255,0.9);border:1px solid var(--rose-200);border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:12px}
