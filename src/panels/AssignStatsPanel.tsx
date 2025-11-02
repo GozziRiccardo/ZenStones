@@ -133,15 +133,71 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                 </td>
                 <td className="dir-cell">
                   <div className="dir-grid">
-                    <DirCheckbox label="↖" checked={!!(dirs & DIR.UL)} onChange={()=>toggleDir(s.id, DIR.UL)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
-                    <DirCheckbox label="↑" checked={!!(dirs & DIR.U)} onChange={()=>toggleDir(s.id, DIR.U)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
-                    <DirCheckbox label="↗" checked={!!(dirs & DIR.UR)} onChange={()=>toggleDir(s.id, DIR.UR)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
-                    <DirCheckbox label="←" checked={!!(dirs & DIR.L)} onChange={()=>toggleDir(s.id, DIR.L)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox
+                      label={<DiagonalArrow direction="ul" />}
+                      ariaLabel="Up-left"
+                      checked={!!(dirs & DIR.UL)}
+                      onChange={()=>toggleDir(s.id, DIR.UL)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
+                    <DirCheckbox
+                      label="↑"
+                      ariaLabel="Up"
+                      checked={!!(dirs & DIR.U)}
+                      onChange={()=>toggleDir(s.id, DIR.U)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
+                    <DirCheckbox
+                      label={<DiagonalArrow direction="ur" />}
+                      ariaLabel="Up-right"
+                      checked={!!(dirs & DIR.UR)}
+                      onChange={()=>toggleDir(s.id, DIR.UR)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
+                    <DirCheckbox
+                      label="←"
+                      ariaLabel="Left"
+                      checked={!!(dirs & DIR.L)}
+                      onChange={()=>toggleDir(s.id, DIR.L)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
                     <div className="dir-center" />
-                    <DirCheckbox label="→" checked={!!(dirs & DIR.R)} onChange={()=>toggleDir(s.id, DIR.R)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
-                    <DirCheckbox label="↙" checked={!!(dirs & DIR.DL)} onChange={()=>toggleDir(s.id, DIR.DL)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
-                    <DirCheckbox label="↓" checked={!!(dirs & DIR.D)} onChange={()=>toggleDir(s.id, DIR.D)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
-                    <DirCheckbox label="↘" checked={!!(dirs & DIR.DR)} onChange={()=>toggleDir(s.id, DIR.DR)} onFocus={()=>onFocusStone?.(s.id)} hideBox />
+                    <DirCheckbox
+                      label="→"
+                      ariaLabel="Right"
+                      checked={!!(dirs & DIR.R)}
+                      onChange={()=>toggleDir(s.id, DIR.R)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
+                    <DirCheckbox
+                      label={<DiagonalArrow direction="dl" />}
+                      ariaLabel="Down-left"
+                      checked={!!(dirs & DIR.DL)}
+                      onChange={()=>toggleDir(s.id, DIR.DL)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
+                    <DirCheckbox
+                      label="↓"
+                      ariaLabel="Down"
+                      checked={!!(dirs & DIR.D)}
+                      onChange={()=>toggleDir(s.id, DIR.D)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
+                    <DirCheckbox
+                      label={<DiagonalArrow direction="dr" />}
+                      ariaLabel="Down-right"
+                      checked={!!(dirs & DIR.DR)}
+                      onChange={()=>toggleDir(s.id, DIR.DR)}
+                      onFocus={()=>onFocusStone?.(s.id)}
+                      hideBox
+                    />
                   </div>
                   <div className="persistence-toggle">
                     <DirCheckbox
@@ -165,11 +221,48 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
   );
 }
 
-function DirCheckbox({ label, checked, onChange, onFocus, hideBox }:{ label:React.ReactNode; checked:boolean; onChange:()=>void; onFocus?:()=>void; hideBox?:boolean }){
+function DirCheckbox({ label, checked, onChange, onFocus, hideBox, ariaLabel }:{ label:React.ReactNode; checked:boolean; onChange:()=>void; onFocus?:()=>void; hideBox?:boolean; ariaLabel?:string }){
   return (
     <label className={`dir-check${hideBox ? ' hide-box' : ''}`}>
-      <input type="checkbox" checked={checked} onChange={onChange} onFocus={onFocus} />
+      <input type="checkbox" checked={checked} onChange={onChange} onFocus={onFocus} aria-label={ariaLabel} />
       {hideBox ? <span className="dir-symbol">{label}</span> : label}
     </label>
+  );
+}
+
+function DiagonalArrow({ direction }:{ direction:'ul'|'ur'|'dl'|'dr' }){
+  const rotations: Record<'ul'|'ur'|'dl'|'dr', number> = {
+    ur: 45,
+    dr: 135,
+    dl: 225,
+    ul: 315,
+  };
+  const rotation = rotations[direction];
+  const center = 12;
+  const shaftStart = 17.5;
+  const shaftEnd = 11;
+  const headTop = 5.5;
+  const headSpread = 3.8;
+  return (
+    <svg className="dir-diagonal-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <g transform={`rotate(${rotation} ${center} ${center})`}>
+        <line
+          x1={center}
+          y1={shaftStart}
+          x2={center}
+          y2={shaftEnd}
+          stroke="currentColor"
+          strokeWidth={2.6}
+          strokeLinecap="round"
+        />
+        <polygon
+          points={`${center},${headTop} ${center - headSpread},${shaftEnd} ${center + headSpread},${shaftEnd}`}
+          fill="currentColor"
+          stroke="currentColor"
+          strokeWidth={1.1}
+          strokeLinejoin="round"
+        />
+      </g>
+    </svg>
   );
 }
