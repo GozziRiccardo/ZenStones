@@ -59,7 +59,13 @@ export async function requestQuickMatch(nickname: string) {
         throw new Error('ALREADY_WAITING');
       }
       if (data.status === 'matched' && data.matchId) {
-        return { kind: 'matched' as const, matchId: data.matchId };
+        const matchRef = doc(db, 'matches', data.matchId);
+        const matchSnap = await transaction.get(matchRef);
+        const matchData = matchSnap.data() as { status?: string } | undefined;
+        if (matchSnap.exists() && matchData?.status === 'active') {
+          return { kind: 'matched' as const, matchId: data.matchId };
+        }
+        transaction.delete(requestRef);
       }
     }
 
@@ -121,14 +127,48 @@ export async function cancelQuickMatch() {
 
 export function watchQuickMatch(uid: string, handler: (state: QuickRequestState | null) => void) {
   const ref = doc(db, 'quickRequests', uid);
-  return onSnapshot(ref, (snap) => {
+  let matchUnsubscribe: (() => void) | null = null;
+  let trackedMatchId: string | null = null;
+
+  const stopMatchWatch = () => {
+    if (matchUnsubscribe) {
+      matchUnsubscribe();
+      matchUnsubscribe = null;
+      trackedMatchId = null;
+    }
+  };
+
+  const unsubscribeRequest = onSnapshot(ref, (snap) => {
     if (!snap.exists()) {
+      stopMatchWatch();
       handler(null);
       return;
     }
     const data = snap.data() as QuickRequestState;
     handler(data);
+
+    if (data.status === 'matched' && data.matchId) {
+      if (trackedMatchId !== data.matchId) {
+        stopMatchWatch();
+        trackedMatchId = data.matchId;
+        const matchRef = doc(db, 'matches', data.matchId);
+        matchUnsubscribe = onSnapshot(matchRef, (matchSnap) => {
+          const matchData = matchSnap.data() as { status?: string } | undefined;
+          if (!matchSnap.exists() || matchData?.status !== 'active') {
+            stopMatchWatch();
+            deleteDoc(ref).catch(() => undefined);
+          }
+        });
+      }
+    } else {
+      stopMatchWatch();
+    }
   });
+
+  return () => {
+    stopMatchWatch();
+    unsubscribeRequest();
+  };
 }
 
 export function watchActiveMatch(uid: string, handler: (match: MatchDoc | null) => void) {
