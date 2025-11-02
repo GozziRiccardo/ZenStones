@@ -138,3 +138,20 @@ hr{border:none;border-top:1px solid #f1f5f9;margin:12px 0}
 .scores-title{font-weight:600;margin-bottom:8px}
 .scores-line,.scores-total{display:flex;justify-content:space-between;font-size:13px}
 .scores-total{margin-top:6px;font-weight:700}
+
+.profile-page{min-height:100vh;position:relative;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.profile-header{width:100%;display:flex;justify-content:flex-start}
+.profile-card{background:rgba(255,255,255,0.92);border-radius:24px;border:1px solid rgba(251,113,133,0.35);box-shadow:0 20px 40px rgba(15,23,42,0.08);padding:32px;max-width:420px;width:100%;display:flex;flex-direction:column;align-items:center;gap:16px}
+.profile-name{font-size:36px;font-weight:800;color:var(--slate-900);text-align:center}
+.profile-elo{font-size:18px;font-weight:600;color:var(--rose-500)}
+.profile-actions{display:flex;gap:12px;justify-content:center;width:100%;flex-wrap:wrap}
+.waiting-message{margin-top:12px;padding:12px 16px;border-radius:12px;background:rgba(254,226,226,0.7);color:var(--slate-700);display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}
+.spinner{width:20px;height:20px;border-radius:50%;border:3px solid rgba(244,63,94,0.25);border-top-color:var(--rose-500);animation:spin 0.9s linear infinite}
+.challenge-input{margin-top:8px;width:100%;display:flex;gap:8px}
+.challenge-input input{flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--rose-200);font-size:15px}
+.challenge-feedback{margin-top:8px;font-size:14px;color:var(--rose-500);text-align:center}
+.challenge-feedback.error{color:#b91c1c}
+.challenge-banner{width:100%;max-width:720px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:rgba(15,23,42,0.78);color:white;padding:14px 20px;border-radius:18px;box-shadow:0 18px 30px rgba(15,23,42,0.22)}
+.challenge-banner-actions{display:flex;gap:12px;flex-wrap:wrap}
+
+@keyframes spin{to{transform:rotate(360deg)}}

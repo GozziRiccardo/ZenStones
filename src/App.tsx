@@ -16,10 +16,10 @@ import { useAuth } from './auth/AuthContext';
 const TICK_INTERVAL = 100;
 const STATE_STORAGE_KEY = 'zenstones-state';
 
-function loadPersistedState(): GameState | null {
+function loadPersistedState(key: string): GameState | null {
   if (typeof window === 'undefined' || !('localStorage' in window)) return null;
   try {
-    const raw = window.localStorage.getItem(STATE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState | null;
     if (!parsed) return null;
@@ -35,10 +35,10 @@ function loadPersistedState(): GameState | null {
       parsed.blockedLabels = { W: {}, B: {} };
     }
     return parsed;
-  } catch (err) {
-    console.warn('Failed to load saved game state:', err);
-    try {
-      window.localStorage.removeItem(STATE_STORAGE_KEY);
+    } catch (err) {
+      console.warn('Failed to load saved game state:', err);
+      try {
+        window.localStorage.removeItem(key);
     } catch {
       // ignore secondary errors removing corrupted state
     }
@@ -48,12 +48,16 @@ function loadPersistedState(): GameState | null {
 
 type Toast = { id: number; message: string };
 
-export default function App() {
+export default function App({ matchId }: { matchId?: string }) {
   const navigate = useNavigate();
+  const persistenceKey = React.useMemo(
+    () => (matchId ? `${STATE_STORAGE_KEY}-${matchId}` : STATE_STORAGE_KEY),
+    [matchId],
+  );
   const [state, dispatch] = React.useReducer(
     gameReducer,
     undefined,
-    () => loadPersistedState() ?? createInitialState(),
+    () => loadPersistedState(persistenceKey) ?? createInitialState(),
   );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
@@ -118,11 +122,11 @@ export default function App() {
   React.useEffect(() => {
     if (typeof window === 'undefined' || !('localStorage' in window)) return;
     try {
-      window.localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+      window.localStorage.setItem(persistenceKey, JSON.stringify(state));
     } catch (err) {
       console.warn('Failed to save game state:', err);
     }
-  }, [state]);
+  }, [state, persistenceKey]);
 
   const prevPhase = React.useRef(state.phase);
   React.useEffect(() => {
@@ -316,7 +320,7 @@ export default function App() {
       setLoggingOut(true);
       await logout();
       try {
-        window.localStorage.removeItem(STATE_STORAGE_KEY);
+        window.localStorage.removeItem(persistenceKey);
       } catch {
         // ignore storage cleanup errors
       }
@@ -326,7 +330,7 @@ export default function App() {
     } finally {
       setLoggingOut(false);
     }
-  }, [logout, navigate]);
+  }, [logout, navigate, persistenceKey]);
 
   const mustPass = React.useMemo(() => {
     if (state.phase !== 'MOVEMENT' || !state.turn) return false;
