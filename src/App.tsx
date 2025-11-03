@@ -16,6 +16,7 @@ import { watchUserProfile } from './lib/matchmaking';
 import { useGameController } from './game/useGameState';
 
 const TICK_INTERVAL = 100;
+const TICK_FAILOVER_DELAY = 4000;
 const STATE_STORAGE_KEY = 'zenstones-state';
 
 type Toast = { id: number; message: string };
@@ -40,7 +41,13 @@ export default function App({ matchId, matchData }: AppProps) {
     () => (matchId ? `${STATE_STORAGE_KEY}-${matchId}` : STATE_STORAGE_KEY),
     [matchId],
   );
-  const { state, dispatch, ready: stateReady, mode: gameMode } = useGameController(matchId, persistenceKey);
+  const {
+    state,
+    dispatch,
+    ready: stateReady,
+    mode: gameMode,
+    updatedAt: remoteUpdatedAt,
+  } = useGameController(matchId, persistenceKey);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
   const [blockedPreview, setBlockedPreview] = React.useState<{ r: number; c: number } | null>(null);
@@ -99,11 +106,58 @@ export default function App({ matchId, matchData }: AppProps) {
   const toastTimers = React.useRef<Record<number, number>>({});
   const blockedTimer = React.useRef<number | null>(null);
   const isRemoteMatch = gameMode === 'remote';
-  const isTickOwner = React.useMemo(() => {
+  const tickingMode = getTickingMode(state);
+  const shouldTickClocks = tickingMode !== 'none';
+  const isPrimaryTickOwner = React.useMemo(() => {
     if (!isRemoteMatch) return true;
     if (!sortedUids.length) return false;
     return user.uid === sortedUids[0];
   }, [isRemoteMatch, sortedUids, user.uid]);
+  const [clockHeartbeat, setClockHeartbeat] = React.useState(() => Date.now());
+  const [failoverNow, setFailoverNow] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    setClockHeartbeat(Date.now());
+  }, [matchId]);
+
+  React.useEffect(() => {
+    if (!isRemoteMatch) return;
+    setClockHeartbeat(Date.now());
+  }, [isPrimaryTickOwner, isRemoteMatch]);
+
+  React.useEffect(() => {
+    if (!isRemoteMatch) return;
+    if (isPrimaryTickOwner) return;
+    setClockHeartbeat(Date.now());
+  }, [isPrimaryTickOwner, isRemoteMatch, state.clocks.W, state.clocks.B]);
+
+  React.useEffect(() => {
+    if (!isRemoteMatch || isPrimaryTickOwner) {
+      setFailoverNow(Date.now());
+      return;
+    }
+    setFailoverNow(Date.now());
+    const id = window.setInterval(() => {
+      setFailoverNow(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [isRemoteMatch, isPrimaryTickOwner]);
+
+  const failoverActive = React.useMemo(() => {
+    if (!isRemoteMatch) return false;
+    if (isPrimaryTickOwner) return false;
+    if (!shouldTickClocks) return false;
+    const baseline =
+      typeof remoteUpdatedAt === 'number' ? Math.max(clockHeartbeat, remoteUpdatedAt) : clockHeartbeat;
+    return failoverNow - baseline > TICK_FAILOVER_DELAY;
+  }, [clockHeartbeat, failoverNow, isPrimaryTickOwner, isRemoteMatch, remoteUpdatedAt, shouldTickClocks]);
+
+  const isTickOwner = React.useMemo(() => {
+    if (!isRemoteMatch) return true;
+    if (!sortedUids.length) return false;
+    if (isPrimaryTickOwner) return true;
+    return failoverActive;
+  }, [failoverActive, isPrimaryTickOwner, isRemoteMatch, sortedUids]);
 
   const pushToast = React.useCallback((message: string) => {
     toastId.current += 1;
@@ -442,7 +496,6 @@ export default function App({ matchId, matchData }: AppProps) {
     });
   }, [state]);
 
-  const tickingMode = getTickingMode(state);
   const isBiddingPhase = state.phase === 'BIDDING';
   const myClockValue = state.clocks[myColor] ?? state.clocks.W;
   const myClockActive = tickingMode === 'both' || tickingMode === myColor;
