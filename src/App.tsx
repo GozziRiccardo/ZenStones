@@ -117,6 +117,10 @@ export default function App({ matchId, matchData }: AppProps) {
   const [failoverNow, setFailoverNow] = React.useState(() => Date.now());
   const pendingRemoteActions = React.useRef(0);
   const failoverActiveRef = React.useRef(false);
+  const gameStateRef = React.useRef(state);
+  const lastRemoteClocks = React.useRef(state.clocks);
+  const pendingFailoverTickTargets = React.useRef<Array<Record<Player, number>>>([]);
+  const accumulatedFailoverDt = React.useRef(0);
   const dispatch = React.useCallback<typeof rawDispatch>(
     (action) => {
       if (isRemoteMatch && failoverActiveRef.current) {
@@ -125,6 +129,26 @@ export default function App({ matchId, matchData }: AppProps) {
       rawDispatch(action);
     },
     [isRemoteMatch, rawDispatch],
+  );
+
+  React.useEffect(() => {
+    gameStateRef.current = state;
+    lastRemoteClocks.current = state.clocks;
+  }, [state]);
+
+  const predictFailoverClocks = React.useCallback(
+    (source: Record<Player, number>, dt: number) => {
+      const mode = getTickingMode(gameStateRef.current);
+      const next: Record<Player, number> = { W: source.W, B: source.B };
+      if (mode === 'both') {
+        next.W = Math.max(0, next.W - dt);
+        next.B = Math.max(0, next.B - dt);
+      } else if (mode === 'W' || mode === 'B') {
+        next[mode] = Math.max(0, next[mode] - dt);
+      }
+      return next;
+    },
+    [],
   );
 
   React.useEffect(() => {
@@ -169,6 +193,8 @@ export default function App({ matchId, matchData }: AppProps) {
     failoverActiveRef.current = failoverActive;
     if (!failoverActive) {
       pendingRemoteActions.current = 0;
+      pendingFailoverTickTargets.current = [];
+      accumulatedFailoverDt.current = 0;
     }
   }, [failoverActive]);
 
@@ -187,6 +213,8 @@ export default function App({ matchId, matchData }: AppProps) {
   React.useEffect(() => {
     if (!isRemoteMatch) {
       pendingRemoteActions.current = 0;
+      pendingFailoverTickTargets.current = [];
+      accumulatedFailoverDt.current = 0;
       return;
     }
     if (!failoverActive) {
@@ -197,10 +225,24 @@ export default function App({ matchId, matchData }: AppProps) {
     }
     if (pendingRemoteActions.current > 0) {
       pendingRemoteActions.current = Math.max(0, pendingRemoteActions.current - 1);
+    }
+    if (pendingFailoverTickTargets.current.length > 0) {
+      const expected = pendingFailoverTickTargets.current[0];
+      if (expected && expected.W === state.clocks.W && expected.B === state.clocks.B) {
+        pendingFailoverTickTargets.current.shift();
+        lastRemoteClocks.current = state.clocks;
+        return;
+      }
+      pendingFailoverTickTargets.current = [];
+      accumulatedFailoverDt.current = 0;
+      setFailoverActive(false);
       return;
     }
-    setFailoverActive(false);
-  }, [failoverActive, isRemoteMatch, remoteUpdatedAt]);
+    if (pendingRemoteActions.current === 0) {
+      accumulatedFailoverDt.current = 0;
+      setFailoverActive(false);
+    }
+  }, [failoverActive, isRemoteMatch, remoteUpdatedAt, state.clocks]);
 
   const isTickOwner = React.useMemo(() => {
     if (!isRemoteMatch) return true;
@@ -256,10 +298,30 @@ export default function App({ matchId, matchData }: AppProps) {
       const now = Date.now();
       const dt = now - lastTick.current;
       lastTick.current = now;
-      dispatch({ type: 'tick', dt });
+      if (failoverActiveRef.current && pendingRemoteActions.current > 0) {
+        accumulatedFailoverDt.current += dt;
+        return;
+      }
+      let effectiveDt = dt;
+      if (failoverActiveRef.current) {
+        effectiveDt += accumulatedFailoverDt.current;
+        accumulatedFailoverDt.current = 0;
+      } else if (accumulatedFailoverDt.current) {
+        accumulatedFailoverDt.current = 0;
+      }
+      if (failoverActiveRef.current) {
+        const base =
+          pendingFailoverTickTargets.current.length > 0
+            ? pendingFailoverTickTargets.current[pendingFailoverTickTargets.current.length - 1]
+            : lastRemoteClocks.current;
+        if (base) {
+          pendingFailoverTickTargets.current.push(predictFailoverClocks(base, effectiveDt));
+        }
+      }
+      dispatch({ type: 'tick', dt: effectiveDt });
     }, TICK_INTERVAL);
     return () => window.clearInterval(id);
-  }, [dispatch, isTickOwner]);
+  }, [dispatch, isTickOwner, predictFailoverClocks]);
 
   const clearOverlayTimer = React.useCallback(() => {
     if (overlayTimerRef.current !== null) {
