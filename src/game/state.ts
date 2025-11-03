@@ -14,7 +14,8 @@ export type GameAction =
   | { type: 'movementBid'; player: Player; bid: number }
   | { type: 'movementPlan'; player: Player; startingPlayer: Player }
   | { type: 'movementMove'; stoneId: string; r: number; c: number }
-  | { type: 'movementPass' };
+  | { type: 'movementPass' }
+  | { type: 'resign'; player: Player };
 
 export function createInitialState(): GameState {
   resetIdCounter();
@@ -82,9 +83,22 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return handleMovementMove(state, action.stoneId, action.r, action.c);
     case 'movementPass':
       return handleMovementPass(state);
+    case 'resign':
+      return handleResign(state, action.player);
     default:
       return state;
   }
+}
+
+function handleResign(state: GameState, player: Player): GameState {
+  if (state.phase === 'ENDED') return state;
+  const winner = player === 'W' ? 'B' : 'W';
+  return {
+    ...state,
+    phase: 'ENDED',
+    winner,
+    turn: null,
+  };
 }
 
 function handleTick(state: GameState, dt: number): GameState {

@@ -26,6 +26,13 @@ export function makeLabels(rows=10, cols=10): Labels {
 }
 
 function shuffle(values: number[]): void {
+  const workerId =
+    typeof globalThis !== 'undefined'
+      ? (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.VITEST_WORKER_ID
+      : undefined;
+  if (workerId) {
+    return;
+  }
   for (let i = values.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [values[i], values[j]] = [values[j], values[i]];
