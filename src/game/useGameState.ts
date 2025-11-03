@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
+import type { Timestamp } from 'firebase/firestore';
 import type { GameState, Player } from './types';
 import type { GameAction } from './state';
 import { createInitialState, gameReducer } from './state';
@@ -43,11 +44,17 @@ function loadPersistedState(key: string): GameState | null {
 
 type GameControllerMode = 'local' | 'remote';
 
+type MatchStateDoc = {
+  state?: GameState;
+  updatedAt?: Timestamp;
+};
+
 type GameController = {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
   ready: boolean;
   mode: GameControllerMode;
+  updatedAt: number | null;
 };
 
 export function useGameController(matchId: string | undefined, persistenceKey: string): GameController {
@@ -72,11 +79,13 @@ export function useGameController(matchId: string | undefined, persistenceKey: s
 
   const [remoteState, setRemoteState] = React.useState<GameState | null>(null);
   const [ready, setReady] = React.useState<boolean>(!matchId);
+  const [remoteUpdatedAt, setRemoteUpdatedAt] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (!matchId) {
       setRemoteState(null);
       setReady(true);
+      setRemoteUpdatedAt(null);
       return;
     }
     let isMounted = true;
@@ -86,21 +95,25 @@ export function useGameController(matchId: string | undefined, persistenceKey: s
       if (!snap.exists()) {
         if (isMounted) {
           setReady(false);
+          setRemoteUpdatedAt(null);
         }
         return;
       }
-      const data = snap.data() as { state?: GameState };
+      const data = snap.data() as MatchStateDoc;
       const incoming = data.state;
       if (!incoming) {
         if (isMounted) {
           setReady(false);
+          setRemoteUpdatedAt(null);
         }
         return;
       }
       const normalized = normalizeState(incoming);
+      const updatedAt = typeof data.updatedAt?.toMillis === 'function' ? data.updatedAt.toMillis() : null;
       if (isMounted) {
         setRemoteState(normalized);
         setReady(true);
+        setRemoteUpdatedAt(updatedAt);
       }
     });
     return () => {
@@ -154,7 +167,7 @@ export function useGameController(matchId: string | undefined, persistenceKey: s
   );
 
   if (!matchId) {
-    return { state: localState, dispatch: localDispatch, ready: true, mode: 'local' };
+    return { state: localState, dispatch: localDispatch, ready: true, mode: 'local', updatedAt: null };
   }
 
   return {
@@ -162,5 +175,6 @@ export function useGameController(matchId: string | undefined, persistenceKey: s
     dispatch: remoteDispatch,
     ready,
     mode: 'remote',
+    updatedAt: remoteUpdatedAt,
   };
 }
