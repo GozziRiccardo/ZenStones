@@ -1,191 +1,193 @@
-import * as React from 'react';
-import { doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
-import type { Timestamp } from 'firebase/firestore';
-import type { GameState, Player } from './types';
-import type { GameAction } from './state';
-import { createInitialState, gameReducer } from './state';
-import { restoreIdCounter } from './utils';
+﻿import * as React from 'react';
+import {
+  onSnapshot,
+  doc,
+  runTransaction,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+  getDoc,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { createInitialState, gameReducer } from './state';
+import type { GameState } from './types';
 
-function normalizeState(input?: GameState | null): GameState {
-  const base = input ? (JSON.parse(JSON.stringify(input)) as GameState) : createInitialState();
-  if (!base.placementCounts) {
-    const counts = { W: 0, B: 0 } as Record<Player, number>;
-    for (const stone of Object.values(base.stones ?? {})) {
-      counts[stone.owner] += 1;
+type Mode = 'none' | 'both' | 'W' | 'B';
+
+export function useGameController(matchId: string | undefined, _persistenceKey: string) {
+  const [state, dispatchLocal] = React.useReducer(gameReducer as any, undefined, () => createInitialState());
+  const [ready, setReady] = React.useState(!matchId);
+  const [mode] = React.useState<Mode>('none');
+  const [updatedAt, setUpdatedAt] = React.useState<number>(Date.now());
+
+  // --- Firestore-safe (de)serialization ---
+  const ROWS = 10;
+  const COLS = 10;
+  const N = ROWS * COLS;
+
+  function flattenBoard(board: (string | null)[][]): string[] {
+    const out = Array<string>(N).fill('');
+    for (let r = 0; r < ROWS; r++) {
+      const row = board[r] || [];
+      for (let c = 0; c < COLS; c++) {
+        const v = row[c];
+        out[r * COLS + c] = v ?? '';
+      }
     }
-    base.placementCounts = counts;
+    return out;
   }
-  if (!base.assignments) {
-    base.assignments = { W: {}, B: {} };
+  function inflateBoard(flat?: unknown): (string | null)[][] {
+    const board: (string | null)[][] = Array.from({ length: ROWS }, () =>
+      Array.from({ length: COLS }, () => null),
+    );
+    if (!Array.isArray(flat)) return board;
+    for (let i = 0; i < Math.min(flat.length, N); i++) {
+      const v = typeof flat[i] === 'string' ? (flat[i] as string) : '';
+      board[Math.floor(i / COLS)][i % COLS] = v || null;
+    }
+    return board;
   }
-  if (!base.assign) {
-    base.assign = { ready: { W: false, B: false } };
-  } else {
-    base.assign.ready = {
-      W: !!base.assign.ready?.W,
-      B: !!base.assign.ready?.B,
+  function flattenLabels(mat?: unknown): number[] {
+    const out = Array<number>(N).fill(0);
+    if (!Array.isArray(mat)) return out;
+    for (let r = 0; r < ROWS; r++) {
+      const row = Array.isArray((mat as any)[r]) ? (mat as any)[r] : [];
+      for (let c = 0; c < COLS; c++) {
+        const v = row[c];
+        out[r * COLS + c] = typeof v === 'number' ? v : 0;
+      }
+    }
+    return out;
+  }
+  function inflateLabels(flat?: unknown): number[][] {
+    const grid: number[][] = Array.from({ length: ROWS }, () =>
+      Array.from({ length: COLS }, () => 0),
+    );
+    if (!Array.isArray(flat)) return grid;
+    for (let i = 0; i < Math.min(flat.length, N); i++) {
+      const v = typeof flat[i] === 'number' ? (flat[i] as number) : 0;
+      grid[Math.floor(i / COLS)][i % COLS] = v;
+    }
+    return grid;
+  }
+
+  function toWire(s: GameState) {
+    return {
+      boardFlat: flattenBoard(s.board),
+      labelsWhiteFlat: flattenLabels(s.labels.whiteHalf),
+      labelsBlackFlat: flattenLabels(s.labels.blackHalf),
+
+      turn: s.turn,
+      phase: s.phase,
+      credits: s.credits,
+      clocks: s.clocks,
+      scores: s.scores,
+      bids: s.bids,
+      movement: s.movement,
+      stones: s.stones,
+      assignments: (s as any).assignments ?? (s as any).assign ?? {},
+      assign: (s as any).assign ?? {},
+      placementCounts: (s as any).placementCounts ?? { W: 0, B: 0 },
+      lastAction: (s as any).lastAction ?? null,
+
+      updatedAt: serverTimestamp(),
     };
   }
-  if (!base.blockedLabels) {
-    base.blockedLabels = { W: {}, B: {} };
+
+  function fromWire(data: any): GameState {
+    const base = createInitialState();
+    base.board = inflateBoard(data?.boardFlat);
+    base.labels.whiteHalf = inflateLabels(data?.labelsWhiteFlat);
+    base.labels.blackHalf = inflateLabels(data?.labelsBlackFlat);
+    base.turn = data?.turn ?? base.turn;
+    base.phase = data?.phase ?? base.phase;
+    base.credits = data?.credits ?? base.credits;
+    base.clocks = data?.clocks ?? base.clocks;
+    base.scores = data?.scores ?? base.scores;
+    base.bids = data?.bids ?? base.bids;
+    base.movement = data?.movement ?? base.movement;
+    base.stones = data?.stones ?? base.stones;
+    (base as any).assignments = data?.assignments ?? (base as any).assignments ?? {};
+    (base as any).assign = data?.assign ?? (base as any).assign ?? {};
+    (base as any).placementCounts = data?.placementCounts ?? (base as any).placementCounts ?? { W: 0, B: 0 };
+    (base as any).lastAction = data?.lastAction ?? (base as any).lastAction ?? null;
+    return base;
   }
-  restoreIdCounter(base);
-  return base;
-}
 
-function loadPersistedState(key: string): GameState | null {
-  if (typeof window === 'undefined' || !('localStorage' in window)) return null;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as GameState | null;
-    if (!parsed) return null;
-    return normalizeState(parsed);
-  } catch (err) {
-    console.warn('Failed to load saved game state:', err);
-    try {
-      window.localStorage.removeItem(key);
-    } catch {
-      // ignore follow-up errors removing corrupted state
-    }
-    return null;
-  }
-}
-
-type GameControllerMode = 'local' | 'remote';
-
-type MatchStateDoc = {
-  state?: GameState;
-  updatedAt?: Timestamp;
-};
-
-type GameController = {
-  state: GameState;
-  dispatch: React.Dispatch<GameAction>;
-  ready: boolean;
-  mode: GameControllerMode;
-  updatedAt: number | null;
-};
-
-export function useGameController(matchId: string | undefined, persistenceKey: string): GameController {
-  const initializer = React.useCallback(() => {
-    if (matchId) {
-      return createInitialState();
-    }
-    return loadPersistedState(persistenceKey) ?? createInitialState();
-  }, [matchId, persistenceKey]);
-
-  const [localState, localDispatch] = React.useReducer(gameReducer, undefined, initializer);
-
+  const pendingWriteRef = React.useRef(false);
+  const stateRef = React.useRef(state);
   React.useEffect(() => {
-    if (matchId) return;
-    if (typeof window === 'undefined' || !('localStorage' in window)) return;
-    try {
-      window.localStorage.setItem(persistenceKey, JSON.stringify(localState));
-    } catch (err) {
-      console.warn('Failed to save game state:', err);
-    }
-  }, [localState, matchId, persistenceKey]);
-
-  const [remoteState, setRemoteState] = React.useState<GameState | null>(null);
-  const [ready, setReady] = React.useState<boolean>(!matchId);
-  const [remoteUpdatedAt, setRemoteUpdatedAt] = React.useState<number | null>(null);
-
-  React.useEffect(() => {
-    if (!matchId) {
-      setRemoteState(null);
-      setReady(true);
-      setRemoteUpdatedAt(null);
-      return;
-    }
-    let isMounted = true;
-    setReady(false);
-    const ref = doc(db, 'matches', matchId);
-    const unsubscribe = onSnapshot(ref, (snap) => {
-      if (!snap.exists()) {
-        if (isMounted) {
-          setReady(false);
-          setRemoteUpdatedAt(null);
-        }
-        return;
-      }
-      const data = snap.data() as MatchStateDoc;
-      const incoming = data.state;
-      if (!incoming) {
-        if (isMounted) {
-          setReady(false);
-          setRemoteUpdatedAt(null);
-        }
-        return;
-      }
-      const normalized = normalizeState(incoming);
-      const updatedAt = typeof data.updatedAt?.toMillis === 'function' ? data.updatedAt.toMillis() : null;
-      if (isMounted) {
-        setRemoteState(normalized);
-        setReady(true);
-        setRemoteUpdatedAt(updatedAt);
-      }
-    });
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, [matchId]);
+    stateRef.current = state;
+  }, [state]);
 
   React.useEffect(() => {
     if (!matchId) return;
-    const ensureState = async () => {
+
+    const stateRefDoc = doc(db, 'matches', matchId, 'state', 'current');
+    const matchRef = doc(db, 'matches', matchId);
+
+    (async () => {
       try {
-        await runTransaction(db, async (transaction) => {
-          const ref = doc(db, 'matches', matchId);
-          const snap = await transaction.get(ref);
-          if (!snap.exists()) {
-            return;
-          }
-          const data = snap.data() as { state?: GameState };
-          if (data.state) {
-            return;
-          }
-          const initial = createInitialState();
-          transaction.set(ref, { state: initial, updatedAt: serverTimestamp() }, { merge: true });
-        });
-      } catch (err) {
-        console.warn('Failed to initialize match state:', err);
+        const s = await getDoc(stateRefDoc);
+        if (!s.exists()) {
+          await runTransaction(db, async (tx) => {
+            const again = await tx.get(stateRefDoc);
+            if (!again.exists()) {
+              tx.set(stateRefDoc, toWire(stateRef.current));
+            }
+            tx.set(matchRef, { updatedAt: serverTimestamp() }, { merge: true });
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to initialize match state:', e);
       }
-    };
-    void ensureState();
+    })();
+
+    const unsub = onSnapshot(
+      stateRefDoc,
+      (snap) => {
+        if (snap.exists()) {
+          const next = fromWire(snap.data());
+          pendingWriteRef.current = false;
+          dispatchLocal({ type: '__remote_replace__', payload: next } as any);
+          setUpdatedAt(Date.now());
+        }
+        setReady(true);
+      },
+      (err) => {
+        console.error('Snapshot error:', err);
+        setReady(true);
+      },
+    );
+    return () => unsub();
   }, [matchId]);
 
-  const remoteDispatch = React.useCallback<React.Dispatch<GameAction>>(
-    (action) => {
-      if (!matchId) return;
-      const ref = doc(db, 'matches', matchId);
-      runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(ref);
-        if (!snap.exists()) {
-          return;
-        }
-        const data = snap.data() as { state?: GameState };
-        const current = normalizeState(data.state);
-        const next = gameReducer(current, action);
-        transaction.set(ref, { state: next, updatedAt: serverTimestamp() }, { merge: true });
-      }).catch((err) => {
-        console.warn('Failed to apply game action:', err);
-      });
-    },
-    [matchId],
-  );
+  const dispatch = React.useCallback((action: any) => {
+    pendingWriteRef.current = true;
+    dispatchLocal(action);
+  }, []);
 
-  if (!matchId) {
-    return { state: localState, dispatch: localDispatch, ready: true, mode: 'local', updatedAt: null };
-  }
+  React.useEffect(() => {
+    if (!matchId) return;
+    if (!pendingWriteRef.current) return;
 
-  return {
-    state: remoteState ?? localState,
-    dispatch: remoteDispatch,
-    ready,
-    mode: 'remote',
-    updatedAt: remoteUpdatedAt,
-  };
+    const stateRefDoc = doc(db, 'matches', matchId, 'state', 'current');
+    const matchRef = doc(db, 'matches', matchId);
+
+    (async () => {
+      try {
+        const wire = toWire(stateRef.current);
+        await updateDoc(stateRefDoc, wire).catch(async () => {
+          await setDoc(stateRefDoc, wire, { merge: true });
+        });
+        await updateDoc(matchRef, { updatedAt: serverTimestamp() }).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to apply game action:', e);
+      } finally {
+        pendingWriteRef.current = false;
+      }
+    })();
+  }, [state, matchId]);
+
+  return { state, dispatch, ready, mode, updatedAt };
 }

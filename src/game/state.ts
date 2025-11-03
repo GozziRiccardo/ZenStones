@@ -1,4 +1,4 @@
-import { makeLabels } from './labels';
+﻿import { makeLabels } from './labels';
 import type { Assignment, GameState, Player, Stone } from './types';
 import { DIR } from './types';
 import { emptyBoard, hasPlacementOption, legalMoves, newId, recalcScores, resetIdCounter, squareCostForPlayer } from './utils';
@@ -67,6 +67,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     state = { ...state, blockedLabels: { W: {}, B: {} } };
   }
   switch (action.type) {
+    case '__remote_replace__':
+      return action.payload as GameState;
     case 'reset':
       return createInitialState();
     case 'tick':
@@ -498,3 +500,4 @@ export function determineScoreWinner(state: GameState): Player {
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
+

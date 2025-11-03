@@ -1,4 +1,4 @@
-import {
+﻿import {
   collection,
   deleteDoc,
   doc,
@@ -283,6 +283,10 @@ export async function acceptChallenge(challengeId: string, uid: string) {
       createdAt: serverTimestamp(),
       mode: 'challenge',
       playerUids: [data.challengerUid, data.targetUid],
+        colors: {
+          [data.challengerUid]: 'W',
+          [data.targetUid]: 'B',
+        },
       players: {
         [data.challengerUid]: {
           nickname: data.challengerNickname,
@@ -311,3 +315,4 @@ export async function denyChallenge(challengeId: string, uid: string) {
     });
   });
 }
+
