@@ -14,6 +14,8 @@ function MatchView() {
   const [matchData, setMatchData] = React.useState<{
     playerUids: string[];
     players: Record<string, { nickname?: string; elo?: number }>;
+    colors?: Record<string, 'W' | 'B'>;
+    status?: string;
   } | null>(null);
 
   React.useEffect(() => {
@@ -32,6 +34,7 @@ function MatchView() {
         playerUids?: string[];
         status?: string;
         players?: Record<string, { nickname?: string; elo?: number }>;
+        colors?: Record<string, 'W' | 'B'>;
       };
       if (!data.playerUids?.includes(user.uid)) {
         setStatus('denied');
@@ -45,7 +48,8 @@ function MatchView() {
       }
       const uids = Array.isArray(data.playerUids) ? data.playerUids : [];
       const players = typeof data.players === 'object' && data.players ? data.players : {};
-      setMatchData({ playerUids: uids, players });
+      const colors = typeof data.colors === 'object' && data.colors ? data.colors : undefined;
+      setMatchData({ playerUids: uids, players, colors, status: data.status });
       setStatus('ready');
     });
     return unsubscribe;

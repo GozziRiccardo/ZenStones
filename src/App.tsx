@@ -12,6 +12,8 @@ import { getTickingMode } from './game/state';
 import { useAuth } from './auth/AuthContext';
 import { watchUserProfile } from './lib/matchmaking';
 import { useGameController } from './game/useGameState';
+import { db } from './lib/firebase';
+import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 const TICK_INTERVAL = 100;
 const TICK_FAILOVER_DELAY = 4000;
@@ -22,6 +24,8 @@ type Toast = { id: number; message: string };
 type MatchPlayersData = {
   playerUids: string[];
   players: Record<string, { nickname?: string; elo?: number }>;
+  colors?: Record<string, Player>;
+  status?: string;
 };
 
 type AppProps = {
@@ -58,26 +62,32 @@ export default function App({ matchId, matchData }: AppProps) {
   const introShownRef = React.useRef(false);
   const bidsOverlayShownRef = React.useRef(false);
   const victoryOverlayShownRef = React.useRef(false);
+  const finishedWrittenRef = React.useRef(false);
   const playerUids = React.useMemo(() => (matchData ? matchData.playerUids.slice() : []), [matchData]);
   const sortedUids = React.useMemo(() => playerUids.slice().sort(), [playerUids]);
   const colorAssignments = React.useMemo(() => {
     const map: Record<string, Player> = {};
+    if (matchData?.colors) {
+      for (const [uid, color] of Object.entries(matchData.colors)) {
+        if (color === 'W' || color === 'B') {
+          map[uid] = color;
+        }
+      }
+    }
     sortedUids.forEach((uid, index) => {
-      if (index === 0) {
-        map[uid] = 'W';
-      } else if (index === 1) {
-        map[uid] = 'B';
-      } else {
+      if (!map[uid]) {
         map[uid] = index % 2 === 0 ? 'W' : 'B';
       }
     });
     return map;
-  }, [sortedUids]);
+  }, [matchData?.colors, sortedUids]);
   const myColor: Player = colorAssignments[user.uid] ?? 'W';
   const opponentUid = React.useMemo(
     () => sortedUids.find((uid) => uid !== user.uid) ?? null,
     [sortedUids, user.uid],
   );
+  const opponentColor: Player | undefined = opponentUid ? colorAssignments[opponentUid] : undefined;
+  const safeOpponentColor: Player = opponentColor ?? (myColor === 'W' ? 'B' : 'W');
   const myDisplayName = React.useMemo(() => {
     const entry = matchData?.players?.[user.uid];
     if (entry?.nickname && entry.nickname.trim()) {
@@ -93,9 +103,7 @@ export default function App({ matchId, matchData }: AppProps) {
     }
     return 'Opponent';
   }, [matchData, opponentUid]);
-  const opponentColor: Player | null = opponentUid
-    ? colorAssignments[opponentUid] ?? (myColor === 'W' ? 'B' : 'W')
-    : null;
+  const visibleOpponentColor = opponentColor ?? safeOpponentColor;
   const myInitialElo = matchData?.players?.[user.uid]?.elo;
   const opponentInitialElo = opponentUid ? matchData?.players?.[opponentUid]?.elo : undefined;
   const myElo = usePlayerElo(user.uid, myInitialElo);
@@ -128,6 +136,10 @@ export default function App({ matchId, matchData }: AppProps) {
 
   React.useEffect(() => {
     setClockHeartbeat(Date.now());
+  }, [matchId]);
+
+  React.useEffect(() => {
+    finishedWrittenRef.current = false;
   }, [matchId]);
 
   React.useEffect(() => {
@@ -365,7 +377,7 @@ export default function App({ matchId, matchData }: AppProps) {
     if (winnerColor === myColor) {
       winnerNickname = myDisplayName ?? fallbackName;
       winnerElo = typeof myElo === 'number' ? myElo : null;
-    } else if (opponentColor === winnerColor) {
+    } else if (visibleOpponentColor === winnerColor) {
       winnerNickname = displayedOpponentNickname;
       winnerElo = typeof opponentElo === 'number' ? opponentElo : null;
     }
@@ -381,12 +393,30 @@ export default function App({ matchId, matchData }: AppProps) {
     myColor,
     myDisplayName,
     myElo,
-    opponentColor,
+    visibleOpponentColor,
     opponentElo,
     overlay,
     state.phase,
     state.winner,
   ]);
+
+  React.useEffect(() => {
+    if (!matchId) return;
+    if (state.phase !== 'ENDED') return;
+    if (state.winner !== 'W' && state.winner !== 'B') return;
+    if (finishedWrittenRef.current) return;
+    finishedWrittenRef.current = true;
+    const winnerColor = state.winner;
+    const winnerUid = Object.keys(colorAssignments).find((uid) => colorAssignments[uid] === winnerColor) ?? null;
+    updateDoc(doc(db, 'matches', matchId), {
+      status: 'finished',
+      result: {
+        winnerUid,
+        reason: 'score',
+      },
+      finishedAt: serverTimestamp(),
+    }).catch(() => undefined);
+  }, [matchId, state.phase, state.winner, colorAssignments]);
 
   const prevPhase = React.useRef(state.phase);
   React.useEffect(() => {
@@ -431,14 +461,12 @@ export default function App({ matchId, matchData }: AppProps) {
         setSelectionSource(null);
       }
     } else if (selectionSource === 'assign') {
-      const expectedPlayer = state.phase === 'ASSIGN_STATS_W' ? 'W'
-        : state.phase === 'ASSIGN_STATS_B' ? 'B' : null;
-      if (!expectedPlayer || stone.owner !== expectedPlayer) {
+      if (state.phase !== 'ASSIGN_STATS' || stone.owner !== myColor) {
         setSelectedId(null);
         setSelectionSource(null);
       }
     }
-  }, [state.phase, state.turn, state.stones, selectedId, selectionSource]);
+  }, [myColor, state.phase, state.turn, state.stones, selectedId, selectionSource]);
 
   const selectedMoves = React.useMemo(() => {
     if (!selectedId) return [] as { r: number; c: number }[];
@@ -515,19 +543,22 @@ export default function App({ matchId, matchData }: AppProps) {
   };
 
   const handlePlacementPass = () => {
-    if (state.phase !== 'PLACEMENT' || !state.turn) return;
-    const player = state.turn;
+    if (state.phase !== 'PLACEMENT') return;
+    if (state.turn !== myColor) return;
+    const player = myColor;
     const placed = state.placementCounts[player];
     const canPlace = hasPlacementOption(state, player);
     if (placed < 1 && canPlace) {
       pushToast('You must place at least one stone before passing.');
       return;
     }
-    dispatch({ type: 'placementPass' });
+    dispatch({ type: 'placementPass', player });
+    setSelectedId(null);
+    setSelectionSource(null);
   };
 
   const handleAssignCommit = (player: Player, assignments: Record<string, Assignment>) => {
-    dispatch({ type: 'assignStats', player, assignments });
+    dispatch({ type: 'assignCommit', player, assignments });
     setSelectedId(null);
     setSelectionSource(null);
   };
@@ -573,21 +604,21 @@ export default function App({ matchId, matchData }: AppProps) {
     if (myColor === 'W') {
       return { nickname: myDisplayName ?? 'You', elo: typeof myElo === 'number' ? myElo : null };
     }
-    if (opponentColor === 'W') {
+    if (visibleOpponentColor === 'W') {
       return { nickname: displayedOpponentNickname, elo: typeof opponentElo === 'number' ? opponentElo : null };
     }
     return { nickname: 'White', elo: null };
-  }, [displayedOpponentNickname, myColor, myDisplayName, myElo, opponentColor, opponentElo]);
+  }, [displayedOpponentNickname, myColor, myDisplayName, myElo, visibleOpponentColor, opponentElo]);
 
   const blackInfo = React.useMemo(() => {
     if (myColor === 'B') {
       return { nickname: myDisplayName ?? 'You', elo: typeof myElo === 'number' ? myElo : null };
     }
-    if (opponentColor === 'B') {
+    if (visibleOpponentColor === 'B') {
       return { nickname: displayedOpponentNickname, elo: typeof opponentElo === 'number' ? opponentElo : null };
     }
     return { nickname: 'Black', elo: null };
-  }, [displayedOpponentNickname, myColor, myDisplayName, myElo, opponentColor, opponentElo]);
+  }, [displayedOpponentNickname, myColor, myDisplayName, myElo, visibleOpponentColor, opponentElo]);
 
   let localPassControl: PassControl | null = null;
   if (state.phase === 'PLACEMENT' && state.turn === myColor) {
@@ -631,23 +662,12 @@ export default function App({ matchId, matchData }: AppProps) {
     if (state.phase === 'BIDDING') {
       return <BiddingPanel state={state} player={myColor} lockBid={handleLockBid} />;
     }
-    if (state.phase === 'ASSIGN_STATS_W') {
+    if (state.phase === 'ASSIGN_STATS') {
       return (
         <AssignStatsPanel
           state={state}
-          player="W"
-          onCommit={(assignments) => handleAssignCommit('W', assignments)}
-          onFocusStone={handleAssignFocus}
-          focusedStoneId={selectionSource === 'assign' ? selectedId : null}
-        />
-      );
-    }
-    if (state.phase === 'ASSIGN_STATS_B') {
-      return (
-        <AssignStatsPanel
-          state={state}
-          player="B"
-          onCommit={(assignments) => handleAssignCommit('B', assignments)}
+          player={myColor}
+          onCommit={(assignments) => handleAssignCommit(myColor, assignments)}
           onFocusStone={handleAssignFocus}
           focusedStoneId={selectionSource === 'assign' ? selectedId : null}
         />

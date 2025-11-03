@@ -9,8 +9,8 @@ export type GameAction =
   | { type: 'lockBid'; player: Player; bid: number }
   | { type: 'startPlacement' }
   | { type: 'placementSquare'; r: number; c: number }
-  | { type: 'placementPass' }
-  | { type: 'assignStats'; player: Player; assignments: Record<string, Assignment> }
+  | { type: 'placementPass'; player: Player }
+  | { type: 'assignCommit'; player: Player; assignments: Record<string, Assignment> }
   | { type: 'movementBid'; player: Player; bid: number }
   | { type: 'movementPlan'; player: Player; startingPlayer: Player }
   | { type: 'movementMove'; stoneId: string; r: number; c: number }
@@ -38,6 +38,8 @@ export function createInitialState(): GameState {
     passesInARow: 0,
     labels,
     assignments: { W: {}, B: {} },
+    assign: { ready: { W: false, B: false } },
+    lastAction: undefined,
     movement: {
       bids: { revealed: false },
       moveCount: 0,
@@ -47,6 +49,10 @@ export function createInitialState(): GameState {
   };
   recalcScores(base);
   return base;
+}
+
+function makeLastAction(state: GameState, by: Player, type: 'pass' | 'place' | 'move') {
+  return { type, by, phase: state.phase } as GameState['lastAction'];
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
@@ -72,9 +78,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'placementSquare':
       return handlePlacement(state, action.r, action.c);
     case 'placementPass':
-      return handlePlacementPass(state);
-    case 'assignStats':
-      return handleAssignStats(state, action.player, action.assignments);
+      return handlePlacementPass(state, action.player);
+    case 'assignCommit':
+      return handleAssignCommit(state, action.player, action.assignments);
     case 'movementBid':
       return handleMovementBid(state, action.player, action.bid);
     case 'movementPlan':
@@ -147,21 +153,22 @@ function handleStartPlacement(state: GameState): GameState {
 
 function handlePlacement(state: GameState, r: number, c: number): GameState {
   if (state.phase !== 'PLACEMENT' || !state.turn) return state;
+  const player = state.turn;
   if (state.board[r][c]) return state;
-  if (state.placementCounts[state.turn] >= 10) return state;
-  const cost = squareCostForPlayer(state, state.turn, r, c);
+  if (state.placementCounts[player] >= 10) return state;
+  const cost = squareCostForPlayer(state, player, r, c);
   if (cost <= 0) return state;
-  if (state.credits[state.turn] < cost) return state;
+  if (state.credits[player] < cost) return state;
   const id = newId();
   const stones = { ...state.stones };
   const board = state.board.map(row => row.slice());
   const credits = { ...state.credits };
-  const stone: Stone = { id, owner: state.turn, r, c };
+  const stone: Stone = { id, owner: player, r, c };
   stones[id] = stone;
   board[r][c] = id;
-  credits[state.turn] -= cost;
-  const nextTurn = state.turn === 'W' ? 'B' : 'W';
-  const placementCounts = { ...state.placementCounts, [state.turn]: state.placementCounts[state.turn] + 1 };
+  credits[player] -= cost;
+  const nextTurn = player === 'W' ? 'B' : 'W';
+  const placementCounts = { ...state.placementCounts, [player]: state.placementCounts[player] + 1 };
   const blockedLabels = {
     W: { ...state.blockedLabels.W },
     B: { ...state.blockedLabels.B },
@@ -178,48 +185,49 @@ function handlePlacement(state: GameState, r: number, c: number): GameState {
     board,
     credits,
     turn: nextTurn,
-    lastPlacementBy: state.turn,
+    lastPlacementBy: player,
     lastPlacementId: id,
     passesInARow: 0,
     placementCounts,
     blockedLabels,
+    lastAction: makeLastAction(state, player, 'place'),
   };
   recalcScores(next);
   return next;
 }
 
-function handlePlacementPass(state: GameState): GameState {
-  if (state.phase !== 'PLACEMENT' || !state.turn) return state;
-  const player = state.turn;
+function handlePlacementPass(state: GameState, player: Player): GameState {
+  if (state.phase !== 'PLACEMENT' || state.turn !== player) return state;
   const placed = state.placementCounts[player];
   if (placed < 1 && hasPlacementOption(state, player)) {
     return state;
   }
   const passes = state.passesInARow + 1;
-  if (passes >= 2) {
-    return endPlacement(state);
-  }
-  return {
+  const opponent = player === 'W' ? 'B' : 'W';
+  const next: GameState = {
     ...state,
     passesInARow: passes,
-    turn: state.turn === 'W' ? 'B' : 'W',
+    turn: opponent,
+    lastAction: makeLastAction(state, player, 'pass'),
   };
+  if (passes >= 2) {
+    return endPlacement({ ...next, passesInARow: 0 });
+  }
+  return next;
 }
 
 function endPlacement(state: GameState): GameState {
   return {
     ...state,
-    phase: 'ASSIGN_STATS_W',
-    turn: 'W',
+    phase: 'ASSIGN_STATS',
+    turn: null,
     passesInARow: 0,
+    assign: { ready: { W: false, B: false } },
   };
 }
 
-function handleAssignStats(state: GameState, player: Player, assignments: Record<string, Assignment>): GameState {
-  if (state.phase !== 'ASSIGN_STATS_W' && state.phase !== 'ASSIGN_STATS_B') return state;
-  if ((state.phase === 'ASSIGN_STATS_W' && player !== 'W') || (state.phase === 'ASSIGN_STATS_B' && player !== 'B')) {
-    return state;
-  }
+function handleAssignCommit(state: GameState, player: Player, assignments: Record<string, Assignment>): GameState {
+  if (state.phase !== 'ASSIGN_STATS') return state;
   const cost = calculateAssignmentCost(assignments);
   if (cost > state.credits[player]) return state;
   const stones = { ...state.stones };
@@ -245,25 +253,26 @@ function handleAssignStats(state: GameState, player: Player, assignments: Record
     ...state.assignments,
     [player]: normalizedAssignments,
   };
+  const assignReady = {
+    ...state.assign.ready,
+    [player]: true,
+  };
   const base: GameState = {
     ...state,
     stones,
     credits,
     assignments: assignmentsState,
+    assign: { ready: assignReady },
   };
-  if (player === 'W') {
-    base.phase = 'ASSIGN_STATS_B';
-    base.turn = 'B';
-    recalcScores(base);
-    return base;
+  if (assignReady.W && assignReady.B) {
+    base.phase = 'MOVEMENT_BIDDING';
+    base.turn = null;
+    base.passesInARow = 0;
+    base.movement = {
+      bids: { revealed: false },
+      moveCount: 0,
+    };
   }
-  base.phase = 'MOVEMENT_BIDDING';
-  base.turn = null;
-  base.passesInARow = 0;
-  base.movement = {
-    bids: { revealed: false },
-    moveCount: 0,
-  };
   recalcScores(base);
   return base;
 }
@@ -284,7 +293,7 @@ function handleMovementBid(state: GameState, player: Player, bid: number): GameS
   const wBid = bids.W;
   const bBid = bids.B;
   if (typeof wBid === 'number' && typeof bBid === 'number' && !bids.revealed) {
-    const winner = wBid === bBid ? 'W' : wBid > bBid ? 'W' : 'B';
+    const winner: Player = wBid === bBid ? 'W' : wBid > bBid ? 'W' : 'B';
     const winningBid = winner === 'W' ? wBid : bBid;
     const credits = { ...state.credits };
     credits[winner] = Math.max(0, credits[winner] - winningBid);
@@ -388,6 +397,7 @@ function handleMovementMove(state: GameState, stoneId: string, r: number, c: num
     lastPlacementId,
     passesInARow: 0,
     movement: nextMovement,
+    lastAction: makeLastAction(state, player, 'move'),
   };
   recalcScores(next);
 
@@ -410,6 +420,7 @@ function handleMovementPass(state: GameState): GameState {
     ...state,
     turn: opponent,
     passesInARow: passes >= 2 ? 0 : passes,
+    lastAction: makeLastAction(state, player, 'pass'),
   };
   if (passes >= 2) {
     recalcScores(next);
@@ -468,10 +479,8 @@ export function getTickingMode(state: GameState): 'none' | 'both' | Player {
     }
     case 'PLACEMENT':
       return state.turn ?? 'none';
-    case 'ASSIGN_STATS_W':
-      return 'W';
-    case 'ASSIGN_STATS_B':
-      return 'B';
+    case 'ASSIGN_STATS':
+      return 'none';
     case 'MOVEMENT':
       return state.turn ?? 'none';
     default:

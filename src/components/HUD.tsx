@@ -124,8 +124,7 @@ function resolvePoints(state: GameState, player: Player): number {
   if (
     state.phase === 'BIDDING' ||
     state.phase === 'PLACEMENT' ||
-    state.phase === 'ASSIGN_STATS_W' ||
-    state.phase === 'ASSIGN_STATS_B' ||
+    state.phase === 'ASSIGN_STATS' ||
     state.phase === 'MOVEMENT_BIDDING'
   ) {
     return state.credits[player];
@@ -153,22 +152,21 @@ function resolveStatus(state: GameState, player: Player, mode: Mode): Status {
       if (state.turn === player) {
         return { text: 'Thinking', tone: 'thinking' };
       }
-      if (state.passesInARow > 0) {
+      if (
+        state.lastAction?.type === 'pass' &&
+        state.lastAction.by === player &&
+        state.lastAction.phase === 'PLACEMENT'
+      ) {
         return { text: 'Passed', tone: 'passed' };
       }
       return null;
     }
-    case 'ASSIGN_STATS_W':
-    case 'ASSIGN_STATS_B': {
-      const active = state.phase === 'ASSIGN_STATS_W' ? 'W' : 'B';
-      if (player === active) {
-        return { text: 'Thinking', tone: 'thinking' };
-      }
-      const assignments = state.assignments[player];
-      if (assignments && Object.keys(assignments).length > 0) {
+    case 'ASSIGN_STATS': {
+      const ready = !!state.assign?.ready?.[player];
+      if (ready) {
         return { text: 'Completed', tone: 'completed' };
       }
-      return { text: 'Waiting', tone: 'waiting' };
+      return { text: 'Thinking', tone: 'thinking' };
     }
     case 'MOVEMENT_BIDDING': {
       const bid = state.movement.bids[player];
@@ -190,7 +188,11 @@ function resolveStatus(state: GameState, player: Player, mode: Mode): Status {
       if (state.turn === player) {
         return { text: 'Thinking', tone: 'thinking' };
       }
-      if (state.passesInARow > 0) {
+      if (
+        state.lastAction?.type === 'pass' &&
+        state.lastAction.by === player &&
+        state.lastAction.phase === 'MOVEMENT'
+      ) {
         return { text: 'Passed', tone: 'passed' };
       }
       return null;

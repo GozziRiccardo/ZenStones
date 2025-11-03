@@ -2,8 +2,7 @@ export type Player = 'W' | 'B';
 export type Phase =
   | 'BIDDING'
   | 'PLACEMENT'
-  | 'ASSIGN_STATS_W'
-  | 'ASSIGN_STATS_B'
+  | 'ASSIGN_STATS'
   | 'MOVEMENT_BIDDING'
   | 'MOVEMENT'
   | 'ENDED';
@@ -33,6 +32,16 @@ export type Stone = {
 };
 
 export type Assignment = { d: Dist; dirs: DirMask; persistent?: boolean };
+
+export type LastAction = {
+  type: 'pass' | 'place' | 'move';
+  by: Player;
+  phase: Phase;
+};
+
+export type AssignState = {
+  ready: { W: boolean; B: boolean };
+};
 
 export type Clocks = { W: number; B: number };
 export type Scores = { W: number; B: number };
@@ -75,6 +84,8 @@ export type GameState = {
   labels: Labels;
   winner?: Player | 'FLAG' | 'SCORE' | 'ELIM';
   assignments: Record<Player, Record<string, Assignment>>;
+  assign: AssignState;
+  lastAction?: LastAction;
   movement: MovementState;
   blockedLabels: Record<Player, Record<number, true>>;
 };

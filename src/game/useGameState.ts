@@ -16,6 +16,17 @@ function normalizeState(input?: GameState | null): GameState {
     }
     base.placementCounts = counts;
   }
+  if (!base.assignments) {
+    base.assignments = { W: {}, B: {} };
+  }
+  if (!base.assign) {
+    base.assign = { ready: { W: false, B: false } };
+  } else {
+    base.assign.ready = {
+      W: !!base.assign.ready?.W,
+      B: !!base.assign.ready?.B,
+    };
+  }
   if (!base.blockedLabels) {
     base.blockedLabels = { W: {}, B: {} };
   }
