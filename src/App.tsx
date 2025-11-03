@@ -351,6 +351,8 @@ export default function App({ matchId, matchData }: AppProps) {
     });
   }, [state.phase, state.bids.revealed, state.bids.startingPlayer, state.bids.W, state.bids.B, overlay]);
 
+  const displayedOpponentNickname = opponentNickname ?? 'Opponent';
+
   React.useEffect(() => {
     if (state.phase !== 'ENDED') return;
     if (victoryOverlayShownRef.current) return;
@@ -566,8 +568,6 @@ export default function App({ matchId, matchData }: AppProps) {
       return legalMoves(state, stone).length > 0;
     });
   }, [state]);
-
-  const displayedOpponentNickname = opponentNickname ?? 'Opponent';
 
   const whiteInfo = React.useMemo(() => {
     if (myColor === 'W') {
