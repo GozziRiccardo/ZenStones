@@ -11,6 +11,10 @@ function MatchView() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [status, setStatus] = React.useState<'loading' | 'ready' | 'denied'>('loading');
+  const [matchData, setMatchData] = React.useState<{
+    playerUids: string[];
+    players: Record<string, { nickname?: string; elo?: number }>;
+  } | null>(null);
 
   React.useEffect(() => {
     if (!matchId) {
@@ -21,17 +25,27 @@ function MatchView() {
     const unsubscribe = onSnapshot(ref, (snap) => {
       if (!snap.exists()) {
         setStatus('denied');
+        setMatchData(null);
         return;
       }
-      const data = snap.data() as { playerUids?: string[]; status?: string };
+      const data = snap.data() as {
+        playerUids?: string[];
+        status?: string;
+        players?: Record<string, { nickname?: string; elo?: number }>;
+      };
       if (!data.playerUids?.includes(user.uid)) {
         setStatus('denied');
+        setMatchData(null);
         return;
       }
       if (data.status !== 'active') {
         setStatus('denied');
+        setMatchData(null);
         return;
       }
+      const uids = Array.isArray(data.playerUids) ? data.playerUids : [];
+      const players = typeof data.players === 'object' && data.players ? data.players : {};
+      setMatchData({ playerUids: uids, players });
       setStatus('ready');
     });
     return unsubscribe;
@@ -61,7 +75,7 @@ function MatchView() {
     return null;
   }
 
-  return <App key={matchId} matchId={matchId} />;
+  return <App key={matchId} matchId={matchId} matchData={matchData ?? undefined} />;
 }
 
 export default function MatchPage() {
