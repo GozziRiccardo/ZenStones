@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './styles.css';
-import type { Assignment, GameState, Player } from './game/types';
-import { legalMoves, squareCostForPlayer, restoreIdCounter, hasPlacementOption } from './game/utils';
+import type { Assignment, Player } from './game/types';
+import { legalMoves, squareCostForPlayer, hasPlacementOption } from './game/utils';
 import { Board } from './components/Board';
 import { HUD } from './components/HUD';
 import { BiddingPanel } from './panels/BiddingPanel';
@@ -10,42 +10,13 @@ import { PlacementPanel } from './panels/PlacementPanel';
 import { AssignStatsPanel } from './panels/AssignStatsPanel';
 import { ScoresPanel } from './panels/ScoresPanel';
 import { MovementBiddingPanel } from './panels/MovementBiddingPanel';
-import { createInitialState, gameReducer, getTickingMode } from './game/state';
+import { getTickingMode } from './game/state';
 import { useAuth } from './auth/AuthContext';
 import { watchUserProfile } from './lib/matchmaking';
+import { useGameController } from './game/useGameState';
 
 const TICK_INTERVAL = 100;
 const STATE_STORAGE_KEY = 'zenstones-state';
-
-function loadPersistedState(key: string): GameState | null {
-  if (typeof window === 'undefined' || !('localStorage' in window)) return null;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as GameState | null;
-    if (!parsed) return null;
-    restoreIdCounter(parsed);
-    if (!parsed.placementCounts) {
-      const counts = { W: 0, B: 0 } as Record<Player, number>;
-      for (const stone of Object.values(parsed.stones ?? {})) {
-        counts[stone.owner] += 1;
-      }
-      parsed.placementCounts = counts;
-    }
-    if (!parsed.blockedLabels) {
-      parsed.blockedLabels = { W: {}, B: {} };
-    }
-    return parsed;
-    } catch (err) {
-      console.warn('Failed to load saved game state:', err);
-      try {
-        window.localStorage.removeItem(key);
-    } catch {
-      // ignore secondary errors removing corrupted state
-    }
-    return null;
-  }
-}
 
 type Toast = { id: number; message: string };
 
@@ -69,11 +40,7 @@ export default function App({ matchId, matchData }: AppProps) {
     () => (matchId ? `${STATE_STORAGE_KEY}-${matchId}` : STATE_STORAGE_KEY),
     [matchId],
   );
-  const [state, dispatch] = React.useReducer(
-    gameReducer,
-    undefined,
-    () => loadPersistedState(persistenceKey) ?? createInitialState(),
-  );
+  const { state, dispatch, ready: stateReady, mode: gameMode } = useGameController(matchId, persistenceKey);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
   const [blockedPreview, setBlockedPreview] = React.useState<{ r: number; c: number } | null>(null);
@@ -131,6 +98,12 @@ export default function App({ matchId, matchData }: AppProps) {
   const lastTick = React.useRef<number>(Date.now());
   const toastTimers = React.useRef<Record<number, number>>({});
   const blockedTimer = React.useRef<number | null>(null);
+  const isRemoteMatch = gameMode === 'remote';
+  const isTickOwner = React.useMemo(() => {
+    if (!isRemoteMatch) return true;
+    if (!sortedUids.length) return false;
+    return user.uid === sortedUids[0];
+  }, [isRemoteMatch, sortedUids, user.uid]);
 
   const pushToast = React.useCallback((message: string) => {
     toastId.current += 1;
@@ -172,6 +145,9 @@ export default function App({ matchId, matchData }: AppProps) {
   }, [state.phase, state.turn]);
 
   React.useEffect(() => {
+    if (!isTickOwner) {
+      return undefined;
+    }
     const id = window.setInterval(() => {
       const now = Date.now();
       const dt = now - lastTick.current;
@@ -179,16 +155,7 @@ export default function App({ matchId, matchData }: AppProps) {
       dispatch({ type: 'tick', dt });
     }, TICK_INTERVAL);
     return () => window.clearInterval(id);
-  }, []);
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined' || !('localStorage' in window)) return;
-    try {
-      window.localStorage.setItem(persistenceKey, JSON.stringify(state));
-    } catch (err) {
-      console.warn('Failed to save game state:', err);
-    }
-  }, [state, persistenceKey]);
+  }, [dispatch, isTickOwner]);
 
   const clearOverlayTimer = React.useCallback(() => {
     if (overlayTimerRef.current !== null) {
@@ -481,6 +448,16 @@ export default function App({ matchId, matchData }: AppProps) {
   const myClockActive = tickingMode === 'both' || tickingMode === myColor;
   const showOpponentChip = Boolean(opponentUid);
   const displayedOpponentNickname = opponentNickname ?? 'Opponent';
+
+  if (matchId && !stateReady) {
+    return (
+      <div className={'container centered-container'}>
+        <div className={'card'} style={{ maxWidth: 360 }}>
+          Syncing match state…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container game-container">
