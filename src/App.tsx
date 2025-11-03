@@ -43,7 +43,7 @@ export default function App({ matchId, matchData }: AppProps) {
   );
   const {
     state,
-    dispatch,
+    dispatch: rawDispatch,
     ready: stateReady,
     mode: gameMode,
     updatedAt: remoteUpdatedAt,
@@ -115,6 +115,17 @@ export default function App({ matchId, matchData }: AppProps) {
   }, [isRemoteMatch, sortedUids, user.uid]);
   const [clockHeartbeat, setClockHeartbeat] = React.useState(() => Date.now());
   const [failoverNow, setFailoverNow] = React.useState(() => Date.now());
+  const pendingRemoteActions = React.useRef(0);
+  const failoverActiveRef = React.useRef(false);
+  const dispatch = React.useCallback<typeof rawDispatch>(
+    (action) => {
+      if (isRemoteMatch && failoverActiveRef.current) {
+        pendingRemoteActions.current += 1;
+      }
+      rawDispatch(action);
+    },
+    [isRemoteMatch, rawDispatch],
+  );
 
   React.useEffect(() => {
     setClockHeartbeat(Date.now());
@@ -143,7 +154,7 @@ export default function App({ matchId, matchData }: AppProps) {
     return () => window.clearInterval(id);
   }, [isRemoteMatch, isPrimaryTickOwner]);
 
-  const failoverActive = React.useMemo(() => {
+  const failoverEligible = React.useMemo(() => {
     if (!isRemoteMatch) return false;
     if (isPrimaryTickOwner) return false;
     if (!shouldTickClocks) return false;
@@ -151,6 +162,45 @@ export default function App({ matchId, matchData }: AppProps) {
       typeof remoteUpdatedAt === 'number' ? Math.max(clockHeartbeat, remoteUpdatedAt) : clockHeartbeat;
     return failoverNow - baseline > TICK_FAILOVER_DELAY;
   }, [clockHeartbeat, failoverNow, isPrimaryTickOwner, isRemoteMatch, remoteUpdatedAt, shouldTickClocks]);
+
+  const [failoverActive, setFailoverActive] = React.useState(false);
+
+  React.useEffect(() => {
+    failoverActiveRef.current = failoverActive;
+    if (!failoverActive) {
+      pendingRemoteActions.current = 0;
+    }
+  }, [failoverActive]);
+
+  React.useEffect(() => {
+    if (!isRemoteMatch || isPrimaryTickOwner || !shouldTickClocks) {
+      if (failoverActive) {
+        setFailoverActive(false);
+      }
+      return;
+    }
+    if (!failoverActive && failoverEligible) {
+      setFailoverActive(true);
+    }
+  }, [failoverActive, failoverEligible, isPrimaryTickOwner, isRemoteMatch, shouldTickClocks]);
+
+  React.useEffect(() => {
+    if (!isRemoteMatch) {
+      pendingRemoteActions.current = 0;
+      return;
+    }
+    if (!failoverActive) {
+      return;
+    }
+    if (remoteUpdatedAt == null) {
+      return;
+    }
+    if (pendingRemoteActions.current > 0) {
+      pendingRemoteActions.current = Math.max(0, pendingRemoteActions.current - 1);
+      return;
+    }
+    setFailoverActive(false);
+  }, [failoverActive, isRemoteMatch, remoteUpdatedAt]);
 
   const isTickOwner = React.useMemo(() => {
     if (!isRemoteMatch) return true;
