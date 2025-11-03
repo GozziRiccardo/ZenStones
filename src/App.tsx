@@ -4,11 +4,9 @@ import './styles.css';
 import type { Assignment, Player } from './game/types';
 import { legalMoves, squareCostForPlayer, hasPlacementOption } from './game/utils';
 import { Board } from './components/Board';
-import { HUD } from './components/HUD';
+import { HUD, type PassControl } from './components/HUD';
 import { BiddingPanel } from './panels/BiddingPanel';
-import { PlacementPanel } from './panels/PlacementPanel';
 import { AssignStatsPanel } from './panels/AssignStatsPanel';
-import { ScoresPanel } from './panels/ScoresPanel';
 import { MovementBiddingPanel } from './panels/MovementBiddingPanel';
 import { getTickingMode } from './game/state';
 import { useAuth } from './auth/AuthContext';
@@ -33,7 +31,8 @@ type AppProps = {
 
 type TemporaryScreen =
   | { type: 'intro'; opponentNickname: string; opponentElo?: number | null; color: Player }
-  | { type: 'bid-result'; winner: Player; winningBid: number; bids: { W?: number; B?: number } };
+  | { type: 'bid-result'; winner: Player; winningBid: number; bids: { W?: number; B?: number } }
+  | { type: 'victory'; color: Player; nickname: string; elo: number | null };
 
 export default function App({ matchId, matchData }: AppProps) {
   const navigate = useNavigate();
@@ -52,13 +51,13 @@ export default function App({ matchId, matchData }: AppProps) {
   const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
   const [blockedPreview, setBlockedPreview] = React.useState<{ r: number; c: number } | null>(null);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
-  const { user, nickname, logout } = useAuth();
-  const [loggingOut, setLoggingOut] = React.useState(false);
+  const { user, nickname } = useAuth();
   const [overlay, setOverlay] = React.useState<TemporaryScreen | null>(null);
   const [overlayCountdown, setOverlayCountdown] = React.useState(0);
   const overlayTimerRef = React.useRef<number | null>(null);
   const introShownRef = React.useRef(false);
   const bidsOverlayShownRef = React.useRef(false);
+  const victoryOverlayShownRef = React.useRef(false);
   const playerUids = React.useMemo(() => (matchData ? matchData.playerUids.slice() : []), [matchData]);
   const sortedUids = React.useMemo(() => playerUids.slice().sort(), [playerUids]);
   const colorAssignments = React.useMemo(() => {
@@ -294,8 +293,11 @@ export default function App({ matchId, matchData }: AppProps) {
       if (screen.type === 'bid-result') {
         dispatch({ type: 'startPlacement' });
       }
+      if (screen.type === 'victory') {
+        navigate('/play', { replace: true });
+      }
     },
-    [dispatch],
+    [dispatch, navigate],
   );
 
   React.useEffect(() => {
@@ -310,6 +312,7 @@ export default function App({ matchId, matchData }: AppProps) {
   React.useEffect(() => {
     introShownRef.current = false;
     bidsOverlayShownRef.current = false;
+    victoryOverlayShownRef.current = false;
   }, [matchId]);
 
   React.useEffect(() => {
@@ -347,6 +350,41 @@ export default function App({ matchId, matchData }: AppProps) {
       bids: { W: state.bids.W, B: state.bids.B },
     });
   }, [state.phase, state.bids.revealed, state.bids.startingPlayer, state.bids.W, state.bids.B, overlay]);
+
+  React.useEffect(() => {
+    if (state.phase !== 'ENDED') return;
+    if (victoryOverlayShownRef.current) return;
+    if (overlay) return;
+    if (state.winner !== 'W' && state.winner !== 'B') return;
+    const winnerColor = state.winner;
+    const fallbackName = winnerColor === 'W' ? 'White' : 'Black';
+    let winnerNickname = fallbackName;
+    let winnerElo: number | null = null;
+    if (winnerColor === myColor) {
+      winnerNickname = myDisplayName ?? fallbackName;
+      winnerElo = typeof myElo === 'number' ? myElo : null;
+    } else if (opponentColor === winnerColor) {
+      winnerNickname = displayedOpponentNickname;
+      winnerElo = typeof opponentElo === 'number' ? opponentElo : null;
+    }
+    victoryOverlayShownRef.current = true;
+    setOverlay({
+      type: 'victory',
+      color: winnerColor,
+      nickname: winnerNickname,
+      elo: winnerElo,
+    });
+  }, [
+    displayedOpponentNickname,
+    myColor,
+    myDisplayName,
+    myElo,
+    opponentColor,
+    opponentElo,
+    overlay,
+    state.phase,
+    state.winner,
+  ]);
 
   const prevPhase = React.useRef(state.phase);
   React.useEffect(() => {
@@ -521,23 +559,6 @@ export default function App({ matchId, matchData }: AppProps) {
     pushToast('You resigned.');
   }, [dispatch, myColor, pushToast, state.phase]);
 
-  const handleLogout = React.useCallback(async () => {
-    try {
-      setLoggingOut(true);
-      await logout();
-      try {
-        window.localStorage.removeItem(persistenceKey);
-      } catch {
-        // ignore storage cleanup errors
-      }
-      navigate('/login', { replace: true });
-    } catch (err) {
-      console.warn('Failed to log out:', err);
-    } finally {
-      setLoggingOut(false);
-    }
-  }, [logout, navigate, persistenceKey]);
-
   const mustPass = React.useMemo(() => {
     if (state.phase !== 'MOVEMENT' || !state.turn) return false;
     return !Object.values(state.stones).some((stone) => {
@@ -546,11 +567,113 @@ export default function App({ matchId, matchData }: AppProps) {
     });
   }, [state]);
 
-  const isBiddingPhase = state.phase === 'BIDDING';
-  const myClockValue = state.clocks[myColor] ?? state.clocks.W;
-  const myClockActive = tickingMode === 'both' || tickingMode === myColor;
-  const showOpponentChip = Boolean(opponentUid);
   const displayedOpponentNickname = opponentNickname ?? 'Opponent';
+
+  const whiteInfo = React.useMemo(() => {
+    if (myColor === 'W') {
+      return { nickname: myDisplayName ?? 'You', elo: typeof myElo === 'number' ? myElo : null };
+    }
+    if (opponentColor === 'W') {
+      return { nickname: displayedOpponentNickname, elo: typeof opponentElo === 'number' ? opponentElo : null };
+    }
+    return { nickname: 'White', elo: null };
+  }, [displayedOpponentNickname, myColor, myDisplayName, myElo, opponentColor, opponentElo]);
+
+  const blackInfo = React.useMemo(() => {
+    if (myColor === 'B') {
+      return { nickname: myDisplayName ?? 'You', elo: typeof myElo === 'number' ? myElo : null };
+    }
+    if (opponentColor === 'B') {
+      return { nickname: displayedOpponentNickname, elo: typeof opponentElo === 'number' ? opponentElo : null };
+    }
+    return { nickname: 'Black', elo: null };
+  }, [displayedOpponentNickname, myColor, myDisplayName, myElo, opponentColor, opponentElo]);
+
+  let localPassControl: PassControl | null = null;
+  if (state.phase === 'PLACEMENT' && state.turn === myColor) {
+    const placed = state.placementCounts[myColor] ?? 0;
+    const canPlace = hasPlacementOption(state, myColor);
+    const mustPlace = placed < 1 && canPlace;
+    const limitReached = placed >= 10;
+    localPassControl = {
+      label: limitReached ? 'Pass (limit reached)' : 'Pass',
+      disabled: mustPlace,
+      tooltip: mustPlace ? 'You must place at least one stone before passing.' : undefined,
+      onClick: handlePlacementPass,
+    };
+  } else if (state.phase === 'MOVEMENT' && state.turn === myColor) {
+    localPassControl = {
+      label: mustPass ? 'Pass (no moves available)' : 'Pass',
+      disabled: false,
+      onClick: handleMovementPass,
+    };
+  }
+
+  const hudPlayers = React.useMemo(
+    () => ({
+      W: {
+        color: 'W' as Player,
+        nickname: whiteInfo.nickname,
+        elo: whiteInfo.elo ?? null,
+        passControl: myColor === 'W' ? localPassControl : null,
+      },
+      B: {
+        color: 'B' as Player,
+        nickname: blackInfo.nickname,
+        elo: blackInfo.elo ?? null,
+        passControl: myColor === 'B' ? localPassControl : null,
+      },
+    }),
+    [blackInfo.elo, blackInfo.nickname, localPassControl, myColor, whiteInfo.elo, whiteInfo.nickname],
+  );
+
+  const sidePanel = React.useMemo(() => {
+    if (state.phase === 'BIDDING') {
+      return <BiddingPanel state={state} player={myColor} lockBid={handleLockBid} />;
+    }
+    if (state.phase === 'ASSIGN_STATS_W') {
+      return (
+        <AssignStatsPanel
+          state={state}
+          player="W"
+          onCommit={(assignments) => handleAssignCommit('W', assignments)}
+          onFocusStone={handleAssignFocus}
+          focusedStoneId={selectionSource === 'assign' ? selectedId : null}
+        />
+      );
+    }
+    if (state.phase === 'ASSIGN_STATS_B') {
+      return (
+        <AssignStatsPanel
+          state={state}
+          player="B"
+          onCommit={(assignments) => handleAssignCommit('B', assignments)}
+          onFocusStone={handleAssignFocus}
+          focusedStoneId={selectionSource === 'assign' ? selectedId : null}
+        />
+      );
+    }
+    if (state.phase === 'MOVEMENT_BIDDING') {
+      return (
+        <MovementBiddingPanel
+          state={state}
+          lockBid={handleMovementBid}
+          submitPlan={handleMovementPlan}
+        />
+      );
+    }
+    return null;
+  }, [
+    handleAssignCommit,
+    handleAssignFocus,
+    handleLockBid,
+    handleMovementBid,
+    handleMovementPlan,
+    myColor,
+    selectedId,
+    selectionSource,
+    state,
+  ]);
 
   if (matchId && !stateReady) {
     return (
@@ -564,122 +687,28 @@ export default function App({ matchId, matchData }: AppProps) {
 
   return (
     <div className="container game-container">
-      <header className="game-header">
-        <div className="h1">ZenStones</div>
-        <div className="game-header-right">
-          <PlayerChip label="You" nickname={myDisplayName} elo={myElo} color={myColor} />
-          {showOpponentChip ? (
-            <PlayerChip
-              label="Opponent"
-              nickname={displayedOpponentNickname}
-              elo={opponentElo}
-              color={opponentColor ?? (myColor === 'W' ? 'B' : 'W')}
-            />
-          ) : null}
-          <button className="btn outline" onClick={handleResign} disabled={state.phase === 'ENDED'}>
-            Resign
-          </button>
-          <button className="btn outline" onClick={handleLogout} disabled={loggingOut}>
-            {loggingOut ? 'Signing out…' : 'Sign out'}
-          </button>
+      <div className="game-top-row">
+        <HUD state={state} tickingMode={tickingMode} players={hudPlayers} />
+        <button className="btn outline resign" onClick={handleResign} disabled={state.phase === 'ENDED'}>
+          Resign
+        </button>
+      </div>
+
+      <div className="game-main">
+        <div className="board-container">
+          <Board
+            state={state}
+            onSquareClick={onSquareClick}
+            highlights={selectedMoves}
+            selectedId={selectedId}
+            blockedPreview={blockedPreview}
+          />
         </div>
-      </header>
-
-      {isBiddingPhase ? (
-        <div className="bidding-view">
-          <ClockCard label="Your clock" ms={myClockValue} active={myClockActive} />
-          <BiddingPanel state={state} player={myColor} lockBid={handleLockBid} />
-        </div>
-      ) : (
-        <>
-          <HUD state={state} tickingMode={tickingMode} />
-          <ScoresPanel state={state} />
-
-          {state.phase === 'ENDED' ? (
-            <div className="card"><b>Game Over.</b> Winner: {state.winner}</div>
-          ) : null}
-
-          <div className="row" style={{ alignItems: 'flex-start' }}>
-            <Board
-              state={state}
-              onSquareClick={onSquareClick}
-              highlights={selectedMoves}
-              selectedId={selectedId}
-              blockedPreview={blockedPreview}
-            />
-            <div style={{ flex: 1, minWidth: 320 }}>
-              {state.phase === 'PLACEMENT' && (
-                <PlacementPanel
-                  state={state}
-                  onPass={handlePlacementPass}
-                />
-              )}
-              {state.phase === 'ASSIGN_STATS_W' && (
-                <AssignStatsPanel
-                  state={state}
-                  player="W"
-                  onCommit={(assignments) => handleAssignCommit('W', assignments)}
-                  onFocusStone={handleAssignFocus}
-                  focusedStoneId={selectionSource === 'assign' ? selectedId : null}
-                />
-              )}
-              {state.phase === 'ASSIGN_STATS_B' && (
-                <AssignStatsPanel
-                  state={state}
-                  player="B"
-                  onCommit={(assignments) => handleAssignCommit('B', assignments)}
-                  onFocusStone={handleAssignFocus}
-                  focusedStoneId={selectionSource === 'assign' ? selectedId : null}
-                />
-              )}
-              {state.phase === 'MOVEMENT_BIDDING' && (
-                <MovementBiddingPanel
-                  state={state}
-                  lockBid={handleMovementBid}
-                  submitPlan={handleMovementPlan}
-                />
-              )}
-              {state.phase === 'MOVEMENT' && (
-                <div className="card movement-card">
-                  <b>Movement:</b> Select one of your stones, then click a highlighted square. Captures remove both stones. You may also pass.
-                  <button className="btn outline" onClick={handleMovementPass} style={{ marginTop: 8 }}>
-                    {mustPass ? 'Pass (no moves available)' : 'Pass'}
-                  </button>
-                  {mustPass ? <div className="small" style={{ marginTop: 4 }}>You have no legal moves available.</div> : null}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+        {sidePanel ? <div className="phase-panel">{sidePanel}</div> : null}
+      </div>
 
       <ToastStack items={toasts} />
       {overlay ? <TemporaryScreenView screen={overlay} countdown={overlayCountdown} /> : null}
-    </div>
-  );
-}
-
-function PlayerChip({ label, nickname, elo, color }: { label: string; nickname: string; elo: number | null; color: Player }) {
-  const indicatorClass = `player-indicator ${color === 'W' ? 'player-white' : 'player-black'}`;
-  return (
-    <div className="player-chip">
-      <span className={indicatorClass} aria-hidden />
-      <div className="player-chip-text">
-        <div className="player-chip-role">{label}</div>
-        <div className="player-chip-name">{nickname}</div>
-        <div className="player-chip-elo">Elo {typeof elo === 'number' ? elo : '—'}</div>
-      </div>
-    </div>
-  );
-}
-
-function ClockCard({ label, ms, active }: { label: string; ms: number; active: boolean }) {
-  const classes = ['clock-card'];
-  if (active) classes.push('active');
-  return (
-    <div className={classes.join(' ')}>
-      <div className="clock-label">{label}</div>
-      <div className="clock-value">{formatClock(ms)}</div>
     </div>
   );
 }
@@ -692,12 +721,23 @@ function TemporaryScreenView({ screen, countdown }: { screen: TemporaryScreen; c
         <div className="temporary-card">
           <div className="temporary-countdown">{countdownValue}</div>
           <div className="temporary-line">
-            You are playing <b>{screen.opponentNickname}</b> with strength <b>{typeof screen.opponentElo === 'number' ? screen.opponentElo : '—'}</b>.
+            You play with <b>{screen.color === 'W' ? 'White' : 'Black'}</b> against <b>{screen.opponentNickname}</b>
+            {' '}of Elo <b>{typeof screen.opponentElo === 'number' ? screen.opponentElo : '—'}</b>.
           </div>
+          <div className="temporary-line">Get ready — the match begins shortly.</div>
+        </div>
+      </div>
+    );
+  }
+  if (screen.type === 'victory') {
+    return (
+      <div className="temporary-screen">
+        <div className="temporary-card">
+          <div className="temporary-countdown">{countdownValue}</div>
           <div className="temporary-line">
-            You have been assigned <b>{screen.color === 'W' ? 'White' : 'Black'}</b>.
+            Winner: <b>{screen.nickname}</b> playing <b>{screen.color === 'W' ? 'White' : 'Black'}</b>.
           </div>
-          <div className="temporary-line">Good luck!</div>
+          <div className="temporary-line">Elo {typeof screen.elo === 'number' ? screen.elo : '—'} — returning to the main menu…</div>
         </div>
       </div>
     );
@@ -707,10 +747,10 @@ function TemporaryScreenView({ screen, countdown }: { screen: TemporaryScreen; c
       <div className="temporary-card">
         <div className="temporary-countdown">{countdownValue}</div>
         <div className="temporary-line">
-          Winning bid: <b>{screen.winningBid}</b> ({screen.winner === 'W' ? 'White' : 'Black'}).
+          Winning bid: <b>{screen.winningBid}</b> points ({screen.winner === 'W' ? 'White' : 'Black'}).
         </div>
         <div className="temporary-line">
-          White bid <b>{screen.bids.W ?? 0}</b> — Black bid <b>{screen.bids.B ?? 0}</b>.
+          White paid <b>{screen.bids.W ?? 0}</b> points — Black paid <b>{screen.bids.B ?? 0}</b> points.
         </div>
         <div className="temporary-line">
           {screen.winner === 'W' ? 'White' : 'Black'} will start placement.
@@ -718,13 +758,6 @@ function TemporaryScreenView({ screen, countdown }: { screen: TemporaryScreen; c
       </div>
     </div>
   );
-}
-
-function formatClock(ms: number) {
-  const clamped = Math.max(0, ms);
-  const minutes = Math.floor(clamped / 60000);
-  const seconds = Math.floor((clamped % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function usePlayerElo(uid: string | null, initial?: number) {
