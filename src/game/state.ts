@@ -230,6 +230,7 @@ function endPlacement(state: GameState): GameState {
 
 function handleAssignCommit(state: GameState, player: Player, assignments: Record<string, Assignment>): GameState {
   if (state.phase !== 'ASSIGN_STATS') return state;
+  if (state.assign?.ready?.[player]) return state;
   const cost = calculateAssignmentCost(assignments);
   if (cost > state.credits[player]) return state;
   const stones = { ...state.stones };
@@ -500,4 +501,5 @@ export function determineScoreWinner(state: GameState): Player {
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
+
 

@@ -1,4 +1,4 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import type { Assignment, GameState, Player } from '../game/types';
 import { DIR } from '../game/types';
 import { calculateAssignmentCost } from '../game/state';
@@ -14,6 +14,9 @@ type AssignStatsPanelProps = {
 };
 
 export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focusedStoneId }: AssignStatsPanelProps){
+  const committed = Boolean((state as any)?.assign?.ready?.[player]);
+  const [submitting, setSubmitting] = React.useState(false);
+  React.useEffect(() => { if (committed) setSubmitting(false); }, [committed]);
   const stones = React.useMemo(()=>Object.values(state.stones).filter(s=>s.owner===player), [state.stones, player]);
   const initial = React.useMemo<AssignMap>(()=>{
     const map:AssignMap = {};
@@ -82,7 +85,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
     <div className="panel card" style={{width:'100%'}}>
       <div className="row gap" style={{alignItems:'center'}}>
         <div>
-          <b>Assign stats for {player}</b> — cost = distance × number_of_options (directions + persistence).
+          <b>Assign stats for {player}</b> â€” cost = distance Ã— number_of_options (directions + persistence).
           Remaining credits: <b>{state.credits[player]}</b>. Planned spend: <b>{cost}</b>.
         </div>
         <div className="row gap" style={{flexWrap:'wrap'}}>
@@ -142,7 +145,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                       hideBox
                     />
                     <DirCheckbox
-                      label="↑"
+                      label="â†‘"
                       ariaLabel="Up"
                       checked={!!(dirs & DIR.U)}
                       onChange={()=>toggleDir(s.id, DIR.U)}
@@ -158,7 +161,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                       hideBox
                     />
                     <DirCheckbox
-                      label="←"
+                      label="â†"
                       ariaLabel="Left"
                       checked={!!(dirs & DIR.L)}
                       onChange={()=>toggleDir(s.id, DIR.L)}
@@ -167,7 +170,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                     />
                     <div className="dir-center" />
                     <DirCheckbox
-                      label="→"
+                      label="â†’"
                       ariaLabel="Right"
                       checked={!!(dirs & DIR.R)}
                       onChange={()=>toggleDir(s.id, DIR.R)}
@@ -183,7 +186,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
                       hideBox
                     />
                     <DirCheckbox
-                      label="↓"
+                      label="â†“"
                       ariaLabel="Down"
                       checked={!!(dirs & DIR.D)}
                       onChange={()=>toggleDir(s.id, DIR.D)}
@@ -215,7 +218,7 @@ export function AssignStatsPanel({ state, player, onCommit, onFocusStone, focuse
         </tbody>
       </table>
       <div className="row gap" style={{justifyContent:'flex-end'}}>
-        <button className="btn" onClick={()=>onCommit(vals)} disabled={insufficient}>Commit ({cost})</button>
+        <button className="btn" disabled={committed || submitting || insufficient} onClick={() => { setSubmitting(true); onCommit(vals); }}>Commit ({cost})</button>
       </div>
     </div>
   );
@@ -266,3 +269,4 @@ function DiagonalArrow({ direction }:{ direction:'ul'|'ur'|'dl'|'dr' }){
     </svg>
   );
 }
+
