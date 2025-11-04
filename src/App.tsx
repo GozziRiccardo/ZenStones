@@ -1,4 +1,4 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './styles.css';
 import type { Assignment, Player } from './game/types';
@@ -427,10 +427,10 @@ export default function App({ matchId, matchData }: AppProps) {
       if (state.phase === 'MOVEMENT' && prevPhase.current !== 'MOVEMENT') {
         const limit = state.movement.moveLimit;
         const summary = limit !== undefined ? `${limit} move${limit === 1 ? '' : 's'}` : 'free movement';
-        pushToast(`Movement phase begins — limit: ${summary}.`);
+        pushToast(`Movement phase begins â€” limit: ${summary}.`);
       }
       if (state.phase === 'ENDED' && state.winner) {
-        pushToast(`Game over — ${state.winner} wins.`);
+        pushToast(`Game over â€” ${state.winner} wins.`);
       }
       prevPhase.current = state.phase;
     }
@@ -442,7 +442,7 @@ export default function App({ matchId, matchData }: AppProps) {
       const chooser = state.movement.bids.winner === 'B' ? 'Black' : 'White';
       const limit = state.movement.moveLimit ?? 0;
       const summary = `${limit} move${limit === 1 ? '' : 's'}`;
-      pushToast(`Movement bids revealed. ${chooser} will choose who starts — limit: ${summary}.`);
+      pushToast(`Movement bids revealed. ${chooser} will choose who starts â€” limit: ${summary}.`);
     }
     prevMovementReveal.current = state.movement.bids.revealed;
   }, [state.movement.bids.revealed, state.movement.bids.winner, pushToast, state.movement.moveLimit]);
@@ -699,14 +699,22 @@ export default function App({ matchId, matchData }: AppProps) {
     return (
       <div className={'container centered-container'}>
         <div className={'card'} style={{ maxWidth: 360 }}>
-          Syncing match state…
+          Syncing match stateâ€¦
         </div>
       </div>
     );
-  }
-
+  }
+if (state.phase === 'BIDDING') {
   return (
     <div className="container game-container">
+      <div className="bidding-fullpage">
+        <BiddingPanel state={state} player={myColor} matchId={matchId} />
+      </div>
+    </div>
+  );
+}
+
+return (<div className="container game-container">
       <div className="game-top-row">
         <HUD state={state} tickingMode={tickingMode} players={hudPlayers} />
         <button className="btn outline resign" onClick={handleResign} disabled={state.phase === 'ENDED'}>
@@ -742,9 +750,9 @@ function TemporaryScreenView({ screen, countdown }: { screen: TemporaryScreen; c
           <div className="temporary-countdown">{countdownValue}</div>
           <div className="temporary-line">
             You play with <b>{screen.color === 'W' ? 'White' : 'Black'}</b> against <b>{screen.opponentNickname}</b>
-            {' '}of Elo <b>{typeof screen.opponentElo === 'number' ? screen.opponentElo : '—'}</b>.
+            {' '}of Elo <b>{typeof screen.opponentElo === 'number' ? screen.opponentElo : 'â€”'}</b>.
           </div>
-          <div className="temporary-line">Get ready — the match begins shortly.</div>
+          <div className="temporary-line">Get ready â€” the match begins shortly.</div>
         </div>
       </div>
     );
@@ -757,7 +765,7 @@ function TemporaryScreenView({ screen, countdown }: { screen: TemporaryScreen; c
           <div className="temporary-line">
             Winner: <b>{screen.nickname}</b> playing <b>{screen.color === 'W' ? 'White' : 'Black'}</b>.
           </div>
-          <div className="temporary-line">Elo {typeof screen.elo === 'number' ? screen.elo : '—'} — returning to the main menu…</div>
+          <div className="temporary-line">Elo {typeof screen.elo === 'number' ? screen.elo : 'â€”'} â€” returning to the main menuâ€¦</div>
         </div>
       </div>
     );
@@ -770,7 +778,7 @@ function TemporaryScreenView({ screen, countdown }: { screen: TemporaryScreen; c
           Winning bid: <b>{screen.winningBid}</b> points ({screen.winner === 'W' ? 'White' : 'Black'}).
         </div>
         <div className="temporary-line">
-          White paid <b>{screen.bids.W ?? 0}</b> points — Black paid <b>{screen.bids.B ?? 0}</b> points.
+          White paid <b>{screen.bids.W ?? 0}</b> points â€” Black paid <b>{screen.bids.B ?? 0}</b> points.
         </div>
         <div className="temporary-line">
           {screen.winner === 'W' ? 'White' : 'Black'} will start placement.
@@ -818,3 +826,4 @@ function ToastStack({ items }: { items: Toast[] }) {
     </div>
   );
 }
+
