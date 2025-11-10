@@ -702,6 +702,7 @@ export default function App({ matchId, matchData }: AppProps) {
         <div className={'card'} style={{ maxWidth: 360 }}>
           Syncing match state…
         </div>
+      </div>
     );
   }
 
@@ -746,11 +747,7 @@ export default function App({ matchId, matchData }: AppProps) {
         <button className="btn outline resign" onClick={handleResign} disabled={state.phase === 'ENDED'}>
           Resign
         </button>
-      {overlay ? <TemporaryScreenView screen={overlay} countdown={overlayCountdown} /> : null}
-    </div>
-  );
-}
-
+      </div>
       <div className="game-main">
         <div className="board-container">
           <Board
