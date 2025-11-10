@@ -138,6 +138,7 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;background-image:url('
 .bidding-input-group{display:flex;flex-direction:column;gap:6px}
 .bidding-waiting{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(231,229,228,0.6);color:var(--stone-600);font-size:13px}
 .bidding-waiting .spinner{width:16px;height:16px;border-width:2px}
+.bidding-error{font-size:13px;color:var(--rose-500);}
 .input{padding:6px 10px;border-radius:10px;border:1px solid var(--rose-300);}
 .number{width:80px}
 .small{font-size:12px;color:#475569}

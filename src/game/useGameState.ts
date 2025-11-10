@@ -14,11 +14,17 @@ import type { GameState } from './types';
 
 type Mode = 'none' | 'both' | 'W' | 'B';
 
+type SyncError = {
+  code?: string;
+  message: string;
+};
+
 export function useGameController(matchId: string | undefined, _persistenceKey: string) {
   const [state, dispatchLocal] = React.useReducer(gameReducer as any, undefined, () => createInitialState());
   const [ready, setReady] = React.useState(!matchId);
   const [mode] = React.useState<Mode>('none');
   const [updatedAt, setUpdatedAt] = React.useState<number>(Date.now());
+  const [syncError, setSyncError] = React.useState<SyncError | null>(null);
 
   // --- Firestore-safe (de)serialization ---
   const ROWS = 10;
@@ -120,6 +126,32 @@ export function useGameController(matchId: string | undefined, _persistenceKey: 
     stateRef.current = state;
   }, [state]);
 
+  const reportSyncError = React.useCallback(
+    (error: unknown) => {
+      if (!matchId) {
+        return;
+      }
+      let code: string | undefined;
+      let message = 'Failed to sync the match state.';
+      if (error && typeof error === 'object') {
+        const maybeCode = (error as { code?: unknown }).code;
+        if (typeof maybeCode === 'string') {
+          code = maybeCode;
+        }
+        const maybeMessage = (error as { message?: unknown }).message;
+        if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+          message = maybeMessage;
+        }
+      } else if (typeof error === 'string') {
+        message = error;
+      }
+
+      setSyncError({ code, message });
+      pendingWriteRef.current = false;
+    },
+    [matchId],
+  );
+
   React.useEffect(() => {
     if (!matchId) return;
 
@@ -138,8 +170,10 @@ export function useGameController(matchId: string | undefined, _persistenceKey: 
             tx.set(matchRef, { updatedAt: serverTimestamp() }, { merge: true });
           });
         }
+        setSyncError(null);
       } catch (e) {
         console.warn('Failed to initialize match state:', e);
+        reportSyncError(e);
       }
     })();
 
@@ -153,14 +187,16 @@ export function useGameController(matchId: string | undefined, _persistenceKey: 
           setUpdatedAt(Date.now());
         }
         setReady(true);
+        setSyncError(null);
       },
       (err) => {
         console.error('Snapshot error:', err);
         setReady(true);
+        reportSyncError(err);
       },
     );
     return () => unsub();
-  }, [matchId]);
+  }, [matchId, reportSyncError]);
 
   const dispatch = React.useCallback((action: any) => {
     pendingWriteRef.current = true;
@@ -170,6 +206,10 @@ export function useGameController(matchId: string | undefined, _persistenceKey: 
   React.useEffect(() => {
     if (!matchId) return;
     if (!pendingWriteRef.current) return;
+    if (syncError?.code === 'permission-denied') {
+      pendingWriteRef.current = false;
+      return;
+    }
 
     const stateRefDoc = doc(db, 'matches', matchId, 'state', 'current');
     const matchRef = doc(db, 'matches', matchId);
@@ -177,17 +217,26 @@ export function useGameController(matchId: string | undefined, _persistenceKey: 
     (async () => {
       try {
         const wire = toWire(stateRef.current);
-        await updateDoc(stateRefDoc, wire).catch(async () => {
+        await updateDoc(stateRefDoc, wire).catch(async (error) => {
+          if (error && typeof error === 'object' && (error as { code?: string }).code === 'permission-denied') {
+            throw error;
+          }
           await setDoc(stateRefDoc, wire, { merge: true });
         });
-        await updateDoc(matchRef, { updatedAt: serverTimestamp() }).catch(() => {});
+        await updateDoc(matchRef, { updatedAt: serverTimestamp() }).catch((error) => {
+          if (error && typeof error === 'object' && (error as { code?: string }).code === 'permission-denied') {
+            throw error;
+          }
+        });
+        setSyncError(null);
       } catch (e) {
         console.warn('Failed to apply game action:', e);
+        reportSyncError(e);
       } finally {
         pendingWriteRef.current = false;
       }
     })();
-  }, [state, matchId]);
+  }, [state, matchId, reportSyncError, syncError]);
 
-  return { state, dispatch, ready, mode, updatedAt };
+  return { state, dispatch, ready, mode, updatedAt, syncError };
 }
