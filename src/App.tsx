@@ -50,6 +50,7 @@ export default function App({ matchId, matchData }: AppProps) {
     ready: stateReady,
     mode: gameMode,
     updatedAt: remoteUpdatedAt,
+    syncError,
   } = useGameController(matchId, persistenceKey);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [selectionSource, setSelectionSource] = React.useState<'movement' | 'assign' | null>(null);
@@ -699,28 +700,56 @@ export default function App({ matchId, matchData }: AppProps) {
     return (
       <div className={'container centered-container'}>
         <div className={'card'} style={{ maxWidth: 360 }}>
-          Syncing match stateâ€¦
+          Syncing match state…
+        </div>
+    );
+  }
+
+  if (matchId && syncError) {
+    const permissionIssue = syncError.code === 'permission-denied';
+    return (
+      <div className="container centered-container">
+        <div className="card" style={{ maxWidth: 420 }}>
+          <h2 style={{ marginTop: 0 }}>Connection lost</h2>
+          <p>
+            {permissionIssue
+              ? 'We no longer have permission to update this match. This can happen if the match was closed or your access was revoked.'
+              : 'We lost the connection to the match and cannot sync your actions right now.'}
+          </p>
+          {!permissionIssue ? (
+            <p>
+              Try refreshing the page or checking your network connection. If the problem persists, you can return to the lobby
+              and re-open the match.
+            </p>
+          ) : null}
+          <button className="btn primary" onClick={() => navigate('/play', { replace: true })}>
+            Back to lobby
+          </button>
         </div>
       </div>
     );
-  }
-if (state.phase === 'BIDDING') {
+  }
+
+  if (state.phase === 'BIDDING') {
+    return (
+      <div className="container game-container">
+        <div className="bidding-fullpage">
+          <BiddingPanel state={state} player={myColor} matchId={matchId} />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="container game-container">
-      <div className="bidding-fullpage">
-        <BiddingPanel state={state} player={myColor} matchId={matchId} />
-      </div>
-    </div>
-  );
-}
-
-return (<div className="container game-container">
       <div className="game-top-row">
         <HUD state={state} tickingMode={tickingMode} players={hudPlayers} />
         <button className="btn outline resign" onClick={handleResign} disabled={state.phase === 'ENDED'}>
           Resign
         </button>
-      </div>
+      {overlay ? <TemporaryScreenView screen={overlay} countdown={overlayCountdown} /> : null}
+    </div>
+  );
+}
 
       <div className="game-main">
         <div className="board-container">

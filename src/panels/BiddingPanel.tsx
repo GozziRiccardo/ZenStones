@@ -10,9 +10,10 @@ type Props = {
 };
 
 export function BiddingPanel({ state, player, lockBid, matchId }: Props) {
-  // Keep a string so mobile can clear the field fully
+  // Keep a string so mobile can fully clear the field
   const [text, setText] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   const myBid = state.bids[player];
   const opp: Player = player === 'W' ? 'B' : 'W';
@@ -27,12 +28,23 @@ export function BiddingPanel({ state, player, lockBid, matchId }: Props) {
     if (!canLock || parsed == null) return;
     try {
       setSubmitting(true);
+      setError(null);
       if (matchId) {
         await lockBidTx(matchId, player, parsed);
       } else if (typeof lockBid === 'function') {
         await Promise.resolve(lockBid(player, parsed));
       } else {
         console.warn('No lockBid or matchId provided.');
+      }
+    } catch (err) {
+      console.error('Failed to lock bid', err);
+      const fallback = matchId
+        ? 'We could not submit your bid. Please check your connection and try again.'
+        : 'We could not lock your bid. Please try again.';
+      if (matchId) {
+        setError(fallback);
+      } else {
+        setError(err instanceof Error && err.message ? err.message : fallback);
       }
     } finally {
       setSubmitting(false);
@@ -63,12 +75,13 @@ export function BiddingPanel({ state, player, lockBid, matchId }: Props) {
           onChange={(e) => {
             if (typeof myBid === 'number') return; // locked
             setText(e.currentTarget.value);
+            setError(null);
           }}
           disabled={typeof myBid === 'number' || submitting}
         />
         {typeof myBid !== 'number' ? (
           <button className="btn" onClick={onLock} disabled={!canLock}>
-            {submitting ? 'Locking...' : 'Lock bid'}
+            {submitting ? 'Locking…' : 'Lock bid'}
           </button>
         ) : (
           <div className="bidding-waiting">Bid locked: {myBid}</div>
@@ -80,7 +93,7 @@ export function BiddingPanel({ state, player, lockBid, matchId }: Props) {
       <div className="bidding-subheading">Opponent status</div>
       <div className="bidding-waiting">
         {!revealed
-          ? (typeof oppBid === 'number' ? 'Opponent: locked' : 'Opponent: waiting...')
+          ? (typeof oppBid === 'number' ? 'Opponent: locked' : 'Opponent: waiting…')
           : `Revealed: White ${state.bids.W ?? 0} vs Black ${state.bids.B ?? 0}`}
       </div>
 
@@ -89,6 +102,14 @@ export function BiddingPanel({ state, player, lockBid, matchId }: Props) {
           <div style={{ height: 8 }} />
           <div className="bidding-waiting">
             Initiative: {(state.bids.startingPlayer ?? 'W') === 'W' ? 'White' : 'Black'}
+          </div>
+        </>
+      ) : null}
+      {error ? (
+        <>
+          <div style={{ height: 8 }} />
+          <div className="bidding-error" role="alert">
+            {error}
           </div>
         </>
       ) : null}
